@@ -62,7 +62,7 @@ func TestExitUsesMappedCode(t *testing.T) {
 
 func TestExitNilIsOK(t *testing.T) {
 	var out, errw bytes.Buffer
-	var got int = -1
+	got := -1
 	w := NewWithExit(&out, &errw, func(c int) { got = c })
 	w.Exit(nil)
 	if got != ExitCodeOK {
@@ -92,7 +92,7 @@ func TestPackageExitDoesNotPanicWithCapture(t *testing.T) {
 	// without terminating the process. Instead verify the symbol exists and
 	// that NewDefault().Exit on a nil error goes through os.Exit path via
 	// a custom writer of our own.
-	var got int = -1
+	got := -1
 	w := NewWithExit(&bytes.Buffer{}, &bytes.Buffer{}, func(c int) { got = c })
 	w.Exit(nil)
 	if got != 0 {

@@ -2,8 +2,6 @@ package keystore
 
 import (
 	"errors"
-	"os"
-	"path/filepath"
 	"testing"
 )
 
@@ -42,18 +40,6 @@ func TestNoneBackend_Operations(t *testing.T) {
 	if err := n.Delete(); err == nil {
 		t.Error("Delete should error")
 	}
-}
-
-// isolatedHome points HOME (and the file-backend path) at a fresh temp dir for
-// the duration of the test, and clears PM_KEYSTORE_PASSPHRASE by default.
-func isolatedHome(t *testing.T) string {
-	t.Helper()
-	dir := t.TempDir()
-	t.Setenv("HOME", dir)
-	t.Setenv("PM_KEYSTORE_PATH", filepath.Join(dir, "creds.enc"))
-	t.Setenv("PM_KEYSTORE_PASSPHRASE", "")
-	os.Unsetenv("PM_KEYSTORE_PASSPHRASE")
-	return dir
 }
 
 func TestServiceConstants(t *testing.T) {

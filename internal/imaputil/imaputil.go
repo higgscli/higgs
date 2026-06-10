@@ -1,3 +1,4 @@
+// Package imaputil provides IMAP mailbox discovery and name-resolution helpers.
 package imaputil
 
 import (

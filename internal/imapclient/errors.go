@@ -1,3 +1,5 @@
+// Package imapclient dials Proton Mail Bridge over IMAP and normalizes
+// protocol errors into structured CLI errors.
 package imapclient
 
 import (

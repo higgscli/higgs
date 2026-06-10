@@ -1,3 +1,4 @@
+// Package email defines the normalized message shape shared across protoncli.
 package email
 
 import (

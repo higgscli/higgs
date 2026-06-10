@@ -3,7 +3,6 @@ package classify
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -332,7 +331,7 @@ func TestClassify_LogsTruncatedSubject(t *testing.T) {
 	srv := newFakeOllama(t, fakeOllamaOpts{content: string(content)})
 	defer srv.Close()
 
-	msg := &email.Message{Subject: fmt.Sprintf("%s", strings.Repeat("x", 200))}
+	msg := &email.Message{Subject: strings.Repeat("x", 200)}
 	if _, err := Classify(context.Background(), srv.URL, "m", msg); err != nil {
 		t.Fatalf("Classify: %v", err)
 	}

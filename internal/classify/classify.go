@@ -1,3 +1,5 @@
+// Package classify runs messages through a local Ollama model and maps the
+// model output onto the canonical protoncli label taxonomy.
 package classify
 
 import (

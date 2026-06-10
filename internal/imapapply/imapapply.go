@@ -1,3 +1,4 @@
+// Package imapapply applies label and mailbox changes back to IMAP.
 package imapapply
 
 import (

@@ -1,3 +1,5 @@
+// Package parse extracts structured content (bodies, attachments) from
+// RFC5322 messages.
 package parse
 
 import (

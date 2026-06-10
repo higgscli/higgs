@@ -25,6 +25,20 @@ linters:
     - misspell
 
   settings:
+    errcheck:
+      # Ignoring the error from these is idiomatic: Close on read paths / defer
+      # cleanup, and Fprint* to in-process buffers/stderr. Real write errors are
+      # surfaced where they matter (e.g. explicit flush/commit paths).
+      exclude-functions:
+        - (*github.com/akeemjenkins/protoncli/internal/state.DB).Close
+        - (*database/sql.DB).Close
+        - (*database/sql.Rows).Close
+        - (*os.File).Close
+        - (*compress/gzip.Reader).Close
+        - (io.ReadCloser).Close
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
     revive:
       severity: warning
       # Note: rules that frequently fire against existing cobra / httptest
@@ -51,12 +65,15 @@ linters:
         - name: unreachable-code
     gosec:
       # Excludes (tune as the codebase evolves):
+      #   G104 — unhandled errors; errcheck is the canonical linter for this and
+      #          already governs the policy (see errcheck.exclude-functions).
       #   G115 — int -> uintN conversions; flagged on deliberate test arithmetic.
       #   G204 — subprocess with variable args; used deliberately in tests.
       #   G304 — file inclusion from variable; see also per-path exclude below.
       #   G306 — WriteFile permission strictness; tests use 0644 intentionally.
       #   G402 — TLS InsecureSkipVerify; IMAP client exposes an opt-in flag.
       excludes:
+        - G104
         - G115
         - G204
         - G304
@@ -65,12 +82,12 @@ linters:
 
   exclusions:
     rules:
-      # Test code legitimately opens files from variables (fixtures, tmp dirs).
+      # Test code is not a production security surface: it opens fixture files
+      # from variables, builds commands/paths from test data (G304/G702/G703),
+      # and intentionally ignores helper return values (t.Cleanup, etc.).
       - path: _test\.go
         linters:
           - gosec
-        text: "G304"
-      # Tests frequently ignore returns from helpers (e.g. t.Cleanup funcs).
       - path: _test\.go
         linters:
           - errcheck

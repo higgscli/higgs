@@ -239,6 +239,7 @@ func (d *DB) GetUnappliedMessages(mailbox string, uidValidity uint32, limit int)
 		ORDER BY uid
 	`
 	if limit > 0 {
+		// #nosec G202 -- limit is an int bound, not user-supplied string input.
 		query += fmt.Sprintf(" LIMIT %d", limit)
 	}
 

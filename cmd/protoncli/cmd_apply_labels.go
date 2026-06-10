@@ -1,3 +1,6 @@
+// Command protoncli is an agent-first CLI for Proton Mail: IMAP mailbox
+// management and local Ollama classification behind a machine-readable schema
+// contract (structured JSON on stdout, typed errors, stable exit codes).
 package main
 
 import (

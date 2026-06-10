@@ -1,3 +1,4 @@
+// Package imapfetch fetches and decodes messages from IMAP mailboxes.
 package imapfetch
 
 import (

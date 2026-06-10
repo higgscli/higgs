@@ -1,3 +1,5 @@
+// Package termio writes structured JSON to stdout and sanitized human-readable
+// progress to stderr.
 package termio
 
 import (

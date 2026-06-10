@@ -43,9 +43,9 @@ func runAttachments(t *testing.T, args ...string) (string, error) {
 	return captureStdout(t, func() error { return cmd.Execute() })
 }
 
-// The memory backend pre-seeds INBOX with a message at UID 6, so messages
-// we append via WithMailbox start at UID 7.
-const firstAppendedUID = "7"
+// imaptest purges the memory backend's default INBOX message before seeding,
+// so the first message we append via WithMailbox is UID 1.
+const firstAppendedUID = "1"
 
 func TestCmdAttachmentsHappy(t *testing.T) {
 	srv := imaptest.Start(t, imaptest.WithMailbox("INBOX", []imaptest.Message{
@@ -103,7 +103,7 @@ func TestCmdAttachmentsFilenameGlob(t *testing.T) {
 	applyTestConfig(t, srv)
 
 	outDir := t.TempDir()
-	stdout, err := runAttachments(t, "INBOX", "--uid", "7,8", "--filename-glob", "*.pdf", "--out", outDir)
+	stdout, err := runAttachments(t, "INBOX", "--uid", "1,2", "--filename-glob", "*.pdf", "--out", outDir)
 	if err != nil {
 		t.Fatalf("attachments: %v (%s)", err, stdout)
 	}
@@ -128,7 +128,7 @@ func TestCmdAttachmentsSizeBounds(t *testing.T) {
 	applyTestConfig(t, srv)
 
 	outDir := t.TempDir()
-	stdout, err := runAttachments(t, "INBOX", "--uid", "7,8", "--min-size", "24", "--out", outDir)
+	stdout, err := runAttachments(t, "INBOX", "--uid", "1,2", "--min-size", "24", "--out", outDir)
 	if err != nil {
 		t.Fatalf("attachments: %v", err)
 	}

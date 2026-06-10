@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"strings"
 	"testing"
@@ -99,12 +100,12 @@ type discardWriter struct{}
 func (discardWriter) Write(p []byte) (int, error) { return len(p), nil }
 
 func TestCmdAskInvocationInvalidBinary(t *testing.T) {
-	// A direct call to cmdAsk with a working ollama environment would
-	// require real agent execution; instead verify that with no server
-	// reachable, we at least surface a wrapped internal error (the
-	// LLM call fails fast).
-	t.Setenv("PM_OLLAMA_BASE_URL", "http://127.0.0.1:1")
-	t.Setenv("PM_OLLAMA_MODEL", "m")
+	// Verify cmdAsk wraps an agent failure as a KindInternal error. We stub
+	// askRunFn (the documented test seam) rather than letting agent.Run exec
+	// os.Executable() — which, under `go test`, is the test binary itself and
+	// would recursively re-run the suite (and leak a handle that breaks
+	// cleanup on Windows). The real agent.Run path is covered in internal/agent.
+	mockAgentRun(t, agent.Answer{}, errors.New("dial tcp 127.0.0.1:1: connection refused"))
 	err := cmdAsk("q", askOptions{maxSteps: 1, baseURL: "http://127.0.0.1:1", model: "m"})
 	if err == nil {
 		t.Fatal("expected error")
@@ -115,8 +116,10 @@ func TestCmdAskInvocationInvalidBinary(t *testing.T) {
 }
 
 func TestCmdAskInvocationTrace(t *testing.T) {
-	// With trace=true, the behavior changes to NDJSON but should still
-	// surface the LLM connectivity error before emitting any events.
+	// With trace=true the error must still surface before any events. Stub the
+	// agent runner (see TestCmdAskInvocationInvalidBinary) to avoid exec-ing
+	// the test binary.
+	mockAgentRun(t, agent.Answer{}, errors.New("connection refused"))
 	err := cmdAsk("q", askOptions{trace: true, baseURL: "http://127.0.0.1:1", model: "m", maxSteps: 1})
 	if err == nil {
 		t.Fatal("expected error")

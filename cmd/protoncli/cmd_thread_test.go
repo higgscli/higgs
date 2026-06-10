@@ -24,9 +24,9 @@ func TestCmdThreadByUID(t *testing.T) {
 	}
 
 	root2 := rootWithCmd(newThreadCmd())
-	// UID 7 corresponds to the first appended message after the memory backend's
-	// built-in Uid=6 seed.
-	root2.SetArgs([]string{"thread", "INBOX", "--uid", "7"})
+	// imaptest purges the memory backend's default INBOX message before
+	// seeding, so the first seeded message ("Hello") is UID 1.
+	root2.SetArgs([]string{"thread", "INBOX", "--uid", "1"})
 	stdout, err := captureStdout(t, func() error { return root2.Execute() })
 	if err != nil {
 		t.Fatalf("thread: %v (%s)", err, stdout)

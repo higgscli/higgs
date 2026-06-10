@@ -10,11 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Initial public release of `protoncli`.
-- 28 subcommands across read, write, LLM, and agentic workflows:
+- 29 subcommands across read, write, LLM, and agentic workflows:
   - Read: `scan-folders`, `search`, `fetch-and-parse`, `attachments`,
     `threads`, `thread`, `state` (stats/clear), `schema`.
   - Write: `move`, `flag`, `mark-read`, `archive`, `trash`, `apply-labels`,
-    `cleanup-labels`, `draft`, `unsubscribe`, `import`, `export`.
+    `cleanup-labels`, `draft`, `send`, `unsubscribe`, `import`, `export`.
   - LLM: `classify` (with `--min-confidence`), `summarize`, `digest`,
     `extract` (schema-driven), `ask` (agentic Q&A).
   - Ops: `backfill`, `watch` (polling), `auth` (login/logout/status).
@@ -33,6 +33,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `draft` composes RFC5322 messages and APPENDs to the Drafts mailbox — does
   NOT send. `unsubscribe` honors `List-Unsubscribe` / `List-Unsubscribe-Post`
   (one-click POST or GET; `mailto:` via SMTP when configured).
+- `send` composes and delivers a message over SMTP (`PM_SMTP_*`), sharing the
+  `draft` flag set. Supports `--in-reply-to` for threaded replies (e.g.
+  replying to a meeting invite), `--dry-run` previews, and an optional
+  `--save-to-sent` (off by default since Proton Bridge auto-files Sent). SMTP
+  delivery failures surface as `api` (exit 1) with `reason: "smtpError"`.
 - Credential storage via OS keyring (macOS Keychain / Windows Credential
   Manager / libsecret) with an encrypted-file fallback
   (`~/.protoncli/credentials.enc`, AES-256-GCM keyed by Argon2id from

@@ -51,9 +51,10 @@ func TestSelectMailbox_And_FetchAllUIDs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SearchUIDs: %v", err)
 	}
-	// The memory backend seeds 1 message by default + our 3 = at least 4.
-	if len(uids) < 4 {
-		t.Fatalf("SearchUIDs = %v (len %d); want >=4", uids, len(uids))
+	// imaptest purges the memory backend's default INBOX message before
+	// seeding, so only our 3 seeded messages remain (UIDs 1..3).
+	if len(uids) != 3 {
+		t.Fatalf("SearchUIDs = %v (len %d); want 3", uids, len(uids))
 	}
 
 	msgs, err := imapfetch.FetchRFC822(c, uids)

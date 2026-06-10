@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -363,12 +364,13 @@ func TestExtractAllHappy(t *testing.T) {
 	if string(data) != "hello pdf" {
 		t.Errorf("contents = %q", string(data))
 	}
-	// Confirm 0700 directory perms on new dir.
+	// Confirm 0700 directory perms on new dir (POSIX modes only; Windows does
+	// not enforce them).
 	info, err := os.Stat(filepath.Join(dir, "new"))
 	if err != nil {
 		t.Fatalf("stat: %v", err)
 	}
-	if info.Mode().Perm()&0o077 != 0 {
+	if runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0 {
 		t.Errorf("dir perms = %v, want 0700", info.Mode().Perm())
 	}
 }

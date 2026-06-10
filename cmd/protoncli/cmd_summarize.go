@@ -249,9 +249,7 @@ func resolveThreadUIDs(c *imapclientgo.Client, seedUID uint32) ([]uint32, error)
 		if m.Envelope != nil {
 			e.messageID = strings.TrimSpace(m.Envelope.MessageId)
 			e.inReplyTo = strings.TrimSpace(m.Envelope.InReplyTo)
-			for _, r := range splitRefs(m.Envelope.InReplyTo) {
-				e.references = append(e.references, r)
-			}
+			e.references = append(e.references, splitRefs(m.Envelope.InReplyTo)...)
 		}
 		byUID[m.Uid] = e
 		if e.messageID != "" {

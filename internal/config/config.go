@@ -1,3 +1,5 @@
+// Package config loads protoncli runtime configuration (IMAP, Ollama, state)
+// from environment variables.
 package config
 
 import (

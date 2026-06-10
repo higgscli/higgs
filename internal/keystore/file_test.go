@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -263,15 +264,19 @@ func TestFileBackend_SetCreatesDirectoryWith0700(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stat dir: %v", err)
 	}
-	if info.Mode().Perm() != 0o700 {
-		t.Errorf("dir perm = %o, want 0700", info.Mode().Perm())
-	}
 	finfo, err := os.Stat(nested)
 	if err != nil {
 		t.Fatalf("stat file: %v", err)
 	}
-	if finfo.Mode().Perm() != 0o600 {
-		t.Errorf("file perm = %o, want 0600", finfo.Mode().Perm())
+	// Windows does not enforce POSIX file modes, so the 0700/0600 bits are
+	// not observable there.
+	if runtime.GOOS != "windows" {
+		if info.Mode().Perm() != 0o700 {
+			t.Errorf("dir perm = %o, want 0700", info.Mode().Perm())
+		}
+		if finfo.Mode().Perm() != 0o600 {
+			t.Errorf("file perm = %o, want 0600", finfo.Mode().Perm())
+		}
 	}
 }
 
@@ -286,6 +291,8 @@ func TestFileBackend_DeleteMissingIsNoOp(t *testing.T) {
 func TestFileBackend_PathOverrideAndHome(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)
+	// os.UserHomeDir resolves %USERPROFILE% on Windows, not $HOME.
+	t.Setenv("USERPROFILE", dir)
 	t.Setenv("PM_KEYSTORE_PATH", "")
 	os.Unsetenv("PM_KEYSTORE_PATH")
 	fb := newFileBackend()

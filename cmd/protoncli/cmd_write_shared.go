@@ -18,11 +18,9 @@ import (
 // writeTarget represents the set of UIDs to operate on, either explicit or
 // resolved from search criteria.
 type writeTarget struct {
-	mailbox       string
-	uids          []uint32
-	allMatching   bool
-	searchFlags   *searchFlags
-	explicitUIDs  string
+	allMatching  bool
+	searchFlags  *searchFlags
+	explicitUIDs string
 }
 
 func addTargetFlags(cmd *cobra.Command, t *writeTarget) {

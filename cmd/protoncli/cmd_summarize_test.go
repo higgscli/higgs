@@ -62,8 +62,8 @@ func TestSummarizeValidation_BothTargets(t *testing.T) {
 }
 
 func TestSummarizeHappy_UIDs(t *testing.T) {
-	// Memory backend's INBOX already ships one message with UID=6; APPEND
-	// adds UID=7. Cover both to keep the test robust across backend tweaks.
+	// imaptest purges the memory backend's default INBOX message before
+	// seeding, so the single seeded message is UID 1.
 	srv := imaptest.Start(t, imaptest.WithMailbox("INBOX", []imaptest.Message{
 		{RFC822: testMsg("Hello", "alice@x.com")},
 	}))
@@ -74,7 +74,7 @@ func TestSummarizeHappy_UIDs(t *testing.T) {
 	t.Setenv("PM_OLLAMA_MODEL", "m")
 
 	root := newSummarizeCmd()
-	root.SetArgs([]string{"INBOX", "--uid", "6,7"})
+	root.SetArgs([]string{"INBOX", "--uid", "1"})
 	stdout, err := captureStdout(t, func() error { return root.Execute() })
 	if err != nil {
 		t.Fatalf("summarize: %v (%s)", err, stdout)
@@ -101,7 +101,7 @@ func TestSummarizeError_OllamaFailure(t *testing.T) {
 	t.Setenv("PM_OLLAMA_MODEL", "m")
 
 	root := newSummarizeCmd()
-	root.SetArgs([]string{"INBOX", "--uid", "6"})
+	root.SetArgs([]string{"INBOX", "--uid", "1"})
 	stdout, err := captureStdout(t, func() error { return root.Execute() })
 	if err != nil {
 		t.Fatalf("expected per-item failure, not top-level error: %v", err)
@@ -121,7 +121,7 @@ func TestSummarizeThreadHappy(t *testing.T) {
 	t.Setenv("PM_OLLAMA_MODEL", "m")
 
 	root := newSummarizeCmd()
-	root.SetArgs([]string{"INBOX", "--thread", "6"})
+	root.SetArgs([]string{"INBOX", "--thread", "1"})
 	stdout, err := captureStdout(t, func() error { return root.Execute() })
 	if err != nil {
 		t.Fatalf("thread: %v (%s)", err, stdout)

@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -43,6 +44,11 @@ func (s *scriptedLLM) fn(ctx context.Context, baseURL, model string, messages []
 // tool.
 func writeAgentFakeBin(t *testing.T, dir string) string {
 	t.Helper()
+	// The fake binary is a POSIX shell script (#!/bin/sh) which Windows cannot
+	// exec directly; these agent integration tests are skipped there.
+	if runtime.GOOS == "windows" {
+		t.Skip("fake binary is a POSIX shell script; not executable on Windows")
+	}
 	path := filepath.Join(dir, "protoncli")
 	script := `#!/bin/sh
 case "$1" in

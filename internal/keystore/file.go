@@ -140,6 +140,7 @@ func (f *fileBackend) Set(c Credentials) error {
 		return fmt.Errorf("keystore/file: mkdir: %w", err)
 	}
 
+	// #nosec G117 -- credentials are serialized only to be AES-256-GCM encrypted on disk.
 	plaintext, err := json.Marshal(c)
 	if err != nil {
 		return fmt.Errorf("keystore/file: encode credentials: %w", err)

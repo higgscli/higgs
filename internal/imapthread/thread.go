@@ -184,9 +184,7 @@ func buildThread(nodes []*Node, idxs []int) *Thread {
 	if len(orphans) > 0 {
 		t.Root = orphans[0]
 		// Chain additional orphans as siblings under the earliest root.
-		for _, o := range orphans[1:] {
-			t.Root.Children = append(t.Root.Children, o)
-		}
+		t.Root.Children = append(t.Root.Children, orphans[1:]...)
 	} else {
 		t.Root = members[0]
 	}

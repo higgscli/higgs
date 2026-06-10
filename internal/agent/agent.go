@@ -137,7 +137,7 @@ func Run(ctx context.Context, question string, opts Options, w io.Writer) (Answe
 		return Answer{}, errors.New("BaseURL required")
 	}
 	if opts.Model == "" {
-		return Answer{}, errors.New("Model required")
+		return Answer{}, errors.New("model required")
 	}
 	maxSteps := opts.MaxSteps
 	if maxSteps <= 0 {

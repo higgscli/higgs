@@ -99,7 +99,7 @@ func TestExtractHappy(t *testing.T) {
 	t.Setenv("PM_OLLAMA_MODEL", "m")
 
 	root := newExtractCmd()
-	root.SetArgs([]string{"INBOX", "--preset", "invoice", "--uid", "6"})
+	root.SetArgs([]string{"INBOX", "--preset", "invoice", "--uid", "1"})
 	stdout, err := captureStdout(t, func() error { return root.Execute() })
 	if err != nil {
 		t.Fatalf("extract: %v (%s)", err, stdout)

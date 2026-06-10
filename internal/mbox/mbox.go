@@ -129,10 +129,9 @@ func sanitizeSender(s string) string {
 // Reader parses messages from an mbox stream. It is tolerant of both
 // mboxo and mboxrd conventions on read.
 type Reader struct {
-	r      *bufio.Reader
-	bufLn  []byte // peeked "From " header line for the next message, if any
-	done   bool
-	primed bool
+	r     *bufio.Reader
+	bufLn []byte // peeked "From " header line for the next message, if any
+	done  bool
 }
 
 // NewReader returns a Reader wrapping r.

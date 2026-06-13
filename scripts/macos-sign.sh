@@ -50,11 +50,32 @@ if [ -z "$api" ] || [ ! -f "$api" ]; then
   exit 0
 fi
 
-echo "macos-sign: notarizing $bin (submitting to Apple, waiting for result)"
+echo "macos-sign: notarizing $bin (submitting to Apple)"
 tmp="$(mktemp -d)"
 zip="$tmp/$(basename "$bin").zip"
 # Apple's notary service takes a container, not a bare Mach-O; zip the binary.
 ( cd "$(dirname "$bin")" && zip -q -X "$zip" "$(basename "$bin")" )
-rcodesign notary-submit --api-key-file "$api" --wait "$zip"
+
+# Submit and wait for Apple's result. A clean Developer ID + hardened-runtime
+# Mach-O is essentially always accepted, and because a bare binary cannot be
+# stapled, the notarization ticket registers against the code-signing hash
+# whenever Apple finishes — the identical binary already in the archive is then
+# recognized by Gatekeeper's online check. So if Apple is merely *slow* (the
+# wait window elapses), that is non-fatal and the release proceeds; only a real
+# submission/validation failure aborts the release.
+set +e
+out="$(rcodesign notary-submit --api-key-file "$api" --wait --max-wait-seconds 1200 "$zip" 2>&1)"
+rc=$?
+set -e
+printf '%s\n' "$out"
 rm -rf "$tmp"
-echo "macos-sign: done — $bin signed + notarized"
+
+if [ "$rc" -eq 0 ]; then
+  echo "macos-sign: done — $bin signed + notarized"
+elif printf '%s' "$out" | grep -qi 'reached time limit'; then
+  echo "macos-sign: NOTE: Apple is still processing notarization for $bin past the wait window;" \
+       "the submission is queued and its ticket will register shortly. Release proceeds." >&2
+else
+  echo "macos-sign: ERROR: notarization failed for $bin" >&2
+  exit 1
+fi

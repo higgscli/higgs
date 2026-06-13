@@ -40,7 +40,7 @@ The default model is [Gemma 4](https://ollama.com/library/gemma4), chosen becaus
 3. Install `higgs`:
    ```
    # Release tarball
-   curl -L https://github.com/akeemjenkins/higgs/releases/latest/download/higgs_1.0.1_darwin_arm64.tar.gz | tar xz
+   curl -L https://github.com/akeemjenkins/higgs/releases/latest/download/higgs_1.0.2_darwin_arm64.tar.gz | tar xz
  
    # go install
    go install github.com/akeemjenkins/higgs/cmd/higgs@latest

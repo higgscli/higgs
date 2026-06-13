@@ -38,10 +38,13 @@ if [ -z "$p12" ] || [ ! -f "$p12" ]; then
   exit 0
 fi
 
+# --binary-identifier pins a stable code-signing identifier; without it the Go
+# linker's generic "a.out" identifier would be preserved.
 echo "macos-sign: signing $bin (Developer ID + hardened runtime)"
 rcodesign sign \
   --p12-file "$p12" \
   --p12-password-file "$pw" \
+  --binary-identifier com.akeemjenkins.higgs \
   --code-signature-flags runtime \
   "$bin"
 
@@ -64,7 +67,7 @@ zip="$tmp/$(basename "$bin").zip"
 # wait window elapses), that is non-fatal and the release proceeds; only a real
 # submission/validation failure aborts the release.
 set +e
-out="$(rcodesign notary-submit --api-key-file "$api" --wait --max-wait-seconds 1200 "$zip" 2>&1)"
+out="$(rcodesign notary-submit --api-key-file "$api" --wait --max-wait-seconds 600 "$zip" 2>&1)"
 rc=$?
 set -e
 printf '%s\n' "$out"

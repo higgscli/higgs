@@ -1,0 +1,58 @@
+# Manual diagnostic: query Apple's Developer ID Notary service for the status of
+# recent notarization submissions (and the detailed log of a specific one).
+# Useful when a release's notarization is still pending — it distinguishes
+# "Apple is slow / In Progress" from "Invalid / rejected".
+#
+# Run it from the Actions tab (Run workflow), or:
+#   gh workflow run notary-status.yml -f submission_id=<uuid>
+name: Notary status
+
+on:
+  workflow_dispatch:
+    inputs:
+      submission_id:
+        description: "Notary submission UUID for the detailed log (optional)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  notary-status:
+    name: notary-status
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install rcodesign
+        run: |
+          set -euo pipefail
+          ver=0.29.0
+          asset="apple-codesign-${ver}-x86_64-unknown-linux-musl"
+          url="https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F${ver}/${asset}.tar.gz"
+          curl -fsSL "$url" -o /tmp/r.tgz
+          echo "dbe85cedd8ee4217b64e9a0e4c2aef92ab8bcaaa41f20bde99781ff02e600002  /tmp/r.tgz" | sha256sum -c -
+          tar -xzf /tmp/r.tgz -C /tmp
+          sudo install -m 0755 "/tmp/${asset}/rcodesign" /usr/local/bin/rcodesign
+          rcodesign --version
+
+      - name: Query notarization status
+        env:
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          SUBMISSION_ID: ${{ inputs.submission_id }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$APPLE_API_KEY_P8" | tr -d '[:space:]' | base64 -d > /tmp/AuthKey.p8
+          rcodesign encode-app-store-connect-api-key --output-path /tmp/asc.json \
+            "$APPLE_API_ISSUER_ID" "$APPLE_API_KEY_ID" /tmp/AuthKey.p8
+
+          echo "::group::Recent submissions (notary-list)"
+          rcodesign notary-list --api-key-file /tmp/asc.json
+          echo "::endgroup::"
+
+          if [ -n "${SUBMISSION_ID}" ]; then
+            echo "::group::Detailed log for ${SUBMISSION_ID} (notary-log)"
+            rcodesign notary-log --api-key-file /tmp/asc.json "${SUBMISSION_ID}" || true
+            echo "::endgroup::"
+          fi

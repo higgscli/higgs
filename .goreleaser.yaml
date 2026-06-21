@@ -71,7 +71,7 @@ brews:
     install: |
       bin.install "higgs"
     test: |
-      system "#{bin}/higgs", "version"
+      system "#{bin}/higgs", "--version"
 
 checksum:
   name_template: "checksums.txt"

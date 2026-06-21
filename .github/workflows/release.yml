@@ -97,3 +97,6 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Fine-grained PAT with write access to higgscli/homebrew-higgs.
+          # Falls back to GITHUB_TOKEN if unset (formula won't be pushed to tap).
+          TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}

@@ -53,6 +53,26 @@ archives:
       - README.md
       - CHANGELOG.md
 
+brews:
+  - name: higgs
+    repository:
+      owner: higgscli
+      name: homebrew-higgs
+      branch: main
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    commit_author:
+      name: github-actions[bot]
+      email: 41898282+github-actions[bot]@users.noreply.github.com
+    commit_msg_template: "Brew formula update for {{ .ProjectName }} {{ .Tag }}"
+    homepage: "https://github.com/higgscli/higgs"
+    description: "Agent-first CLI for Proton Mail — schema manifest, NDJSON, typed errors, stable exit codes"
+    license: "Apache-2.0"
+    skip_upload: auto
+    install: |
+      bin.install "higgs"
+    test: |
+      system "#{bin}/higgs", "version"
+
 checksum:
   name_template: "checksums.txt"
   algorithm: sha256

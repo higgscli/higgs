@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/akeemjenkins/higgs/internal/cerr"
-	"github.com/akeemjenkins/higgs/internal/ollama"
+	"github.com/higgscli/higgs/internal/cerr"
+	"github.com/higgscli/higgs/internal/ollama"
 )
 
 //go:embed schemas/*.json

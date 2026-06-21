@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/akeemjenkins/higgs/internal/agent"
-	"github.com/akeemjenkins/higgs/internal/cerr"
+	"github.com/higgscli/higgs/internal/agent"
+	"github.com/higgscli/higgs/internal/cerr"
 )
 
 func TestCmdAskUsageAndFlags(t *testing.T) {

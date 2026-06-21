@@ -11,8 +11,8 @@ import (
 
 	"github.com/emersion/go-imap/client"
 
-	"github.com/akeemjenkins/higgs/internal/imaptest"
-	"github.com/akeemjenkins/higgs/internal/state"
+	"github.com/higgscli/higgs/internal/imaptest"
+	"github.com/higgscli/higgs/internal/state"
 )
 
 // mustDial is a minimal Dial+Login helper for tests that need direct IMAP

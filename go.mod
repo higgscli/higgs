@@ -1,4 +1,4 @@
-module github.com/akeemjenkins/higgs
+module github.com/higgscli/higgs
 
 go 1.26.2
 

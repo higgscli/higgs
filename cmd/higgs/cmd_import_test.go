@@ -15,9 +15,9 @@ import (
 	"github.com/emersion/go-imap"
 	"github.com/emersion/go-imap/client"
 
-	"github.com/akeemjenkins/higgs/internal/cerr"
-	"github.com/akeemjenkins/higgs/internal/imaptest"
-	"github.com/akeemjenkins/higgs/internal/mbox"
+	"github.com/higgscli/higgs/internal/cerr"
+	"github.com/higgscli/higgs/internal/imaptest"
+	"github.com/higgscli/higgs/internal/mbox"
 )
 
 func TestWrapImportResolveErr(t *testing.T) {

@@ -6,8 +6,8 @@ import (
 
 	"github.com/emersion/go-imap"
 
-	"github.com/akeemjenkins/higgs/internal/imapclient"
-	"github.com/akeemjenkins/higgs/internal/imaptest"
+	"github.com/higgscli/higgs/internal/imapclient"
+	"github.com/higgscli/higgs/internal/imaptest"
 )
 
 func ptrBool(b bool) *bool { return &b }

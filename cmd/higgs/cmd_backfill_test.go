@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/akeemjenkins/higgs/internal/cerr"
-	"github.com/akeemjenkins/higgs/internal/state"
+	"github.com/higgscli/higgs/internal/cerr"
+	"github.com/higgscli/higgs/internal/state"
 )
 
 func TestBackfillCmdShape(t *testing.T) {

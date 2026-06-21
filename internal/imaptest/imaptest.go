@@ -15,7 +15,7 @@ import (
 	"github.com/emersion/go-imap/client"
 	"github.com/emersion/go-imap/server"
 
-	"github.com/akeemjenkins/higgs/internal/config"
+	"github.com/higgscli/higgs/internal/config"
 )
 
 // Credentials used by the memory backend. These match the defaults baked in

@@ -10,9 +10,9 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"github.com/akeemjenkins/higgs/internal/cerr"
-	"github.com/akeemjenkins/higgs/internal/keystore"
-	"github.com/akeemjenkins/higgs/internal/termio"
+	"github.com/higgscli/higgs/internal/cerr"
+	"github.com/higgscli/higgs/internal/keystore"
+	"github.com/higgscli/higgs/internal/termio"
 )
 
 // authStdin is the reader used by `auth login` for username and piped-password

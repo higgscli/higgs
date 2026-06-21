@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/akeemjenkins/higgs/internal/email"
-	"github.com/akeemjenkins/higgs/internal/labels"
+	"github.com/higgscli/higgs/internal/email"
+	"github.com/higgscli/higgs/internal/labels"
 )
 
 func TestAllowedLabelsMatchesTaxonomy(t *testing.T) {

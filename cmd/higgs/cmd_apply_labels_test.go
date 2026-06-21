@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/akeemjenkins/higgs/internal/cerr"
+	"github.com/higgscli/higgs/internal/cerr"
 )
 
 func TestApplyLabelsCmdFlags(t *testing.T) {

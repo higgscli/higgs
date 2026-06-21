@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/akeemjenkins/higgs/internal/cerr"
+	"github.com/higgscli/higgs/internal/cerr"
 )
 
 func TestScanFoldersCmdShape(t *testing.T) {

@@ -6,7 +6,7 @@ import (
 
 	"github.com/emersion/go-imap"
 
-	"github.com/akeemjenkins/higgs/internal/imapfetch"
+	"github.com/higgscli/higgs/internal/imapfetch"
 )
 
 func TestTruncate(t *testing.T) {

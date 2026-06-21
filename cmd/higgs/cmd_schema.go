@@ -7,8 +7,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/akeemjenkins/higgs/internal/cerr"
-	"github.com/akeemjenkins/higgs/internal/termio"
+	"github.com/higgscli/higgs/internal/cerr"
+	"github.com/higgscli/higgs/internal/termio"
 )
 
 func newSchemaCmd() *cobra.Command {

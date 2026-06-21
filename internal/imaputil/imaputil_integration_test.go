@@ -3,9 +3,9 @@ package imaputil_test
 import (
 	"testing"
 
-	"github.com/akeemjenkins/higgs/internal/imapclient"
-	"github.com/akeemjenkins/higgs/internal/imaputil"
-	"github.com/akeemjenkins/higgs/internal/imaptest"
+	"github.com/higgscli/higgs/internal/imapclient"
+	"github.com/higgscli/higgs/internal/imaputil"
+	"github.com/higgscli/higgs/internal/imaptest"
 )
 
 func TestListMailboxes_OverRealConnection(t *testing.T) {

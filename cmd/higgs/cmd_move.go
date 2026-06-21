@@ -3,10 +3,10 @@ package main
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/akeemjenkins/higgs/internal/cerr"
-	"github.com/akeemjenkins/higgs/internal/imapclient"
-	"github.com/akeemjenkins/higgs/internal/imapwrite"
-	"github.com/akeemjenkins/higgs/internal/termio"
+	"github.com/higgscli/higgs/internal/cerr"
+	"github.com/higgscli/higgs/internal/imapclient"
+	"github.com/higgscli/higgs/internal/imapwrite"
+	"github.com/higgscli/higgs/internal/termio"
 )
 
 func newMoveCmd() *cobra.Command {

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/akeemjenkins/higgs/internal/cerr"
-	"github.com/akeemjenkins/higgs/internal/imaptest"
+	"github.com/higgscli/higgs/internal/cerr"
+	"github.com/higgscli/higgs/internal/imaptest"
 )
 
 // fakeOllamaJSON spins up an httptest server that returns a canned JSON

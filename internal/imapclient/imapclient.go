@@ -7,8 +7,8 @@ import (
 
 	"github.com/emersion/go-imap/client"
 
-	"github.com/akeemjenkins/higgs/internal/config"
-	"github.com/akeemjenkins/higgs/internal/termio"
+	"github.com/higgscli/higgs/internal/config"
+	"github.com/higgscli/higgs/internal/termio"
 )
 
 // Client is the go-imap v1 client (same as Proton Bridge tests use).

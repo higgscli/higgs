@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/akeemjenkins/higgs/internal/cerr"
-	"github.com/akeemjenkins/higgs/internal/imapclient"
-	"github.com/akeemjenkins/higgs/internal/imaptest"
+	"github.com/higgscli/higgs/internal/cerr"
+	"github.com/higgscli/higgs/internal/imapclient"
+	"github.com/higgscli/higgs/internal/imaptest"
 )
 
 // fakeSMTP is a minimal SMTP server that speaks the full net/smtp client

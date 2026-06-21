@@ -7,9 +7,9 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/akeemjenkins/higgs/internal/cerr"
-	"github.com/akeemjenkins/higgs/internal/imaptest"
-	"github.com/akeemjenkins/higgs/internal/smtp"
+	"github.com/higgscli/higgs/internal/cerr"
+	"github.com/higgscli/higgs/internal/imaptest"
+	"github.com/higgscli/higgs/internal/smtp"
 )
 
 // useTLSTestClient swaps unsubscribeHTTPClient for one that trusts the test

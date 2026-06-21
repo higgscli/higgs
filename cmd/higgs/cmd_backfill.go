@@ -10,9 +10,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/akeemjenkins/higgs/internal/cerr"
-	"github.com/akeemjenkins/higgs/internal/state"
-	"github.com/akeemjenkins/higgs/internal/termio"
+	"github.com/higgscli/higgs/internal/cerr"
+	"github.com/higgscli/higgs/internal/state"
+	"github.com/higgscli/higgs/internal/termio"
 )
 
 func newBackfillCmd() *cobra.Command {

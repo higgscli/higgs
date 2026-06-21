@@ -8,8 +8,8 @@ import (
 	"github.com/emersion/go-imap"
 	"github.com/emersion/go-imap/client"
 
-	"github.com/akeemjenkins/higgs/internal/imaputil"
-	"github.com/akeemjenkins/higgs/internal/termio"
+	"github.com/higgscli/higgs/internal/imaputil"
+	"github.com/higgscli/higgs/internal/termio"
 )
 
 // LabelsRoot is the IMAP mailbox name for the Labels parent (e.g. "Labels").

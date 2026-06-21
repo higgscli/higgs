@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/akeemjenkins/higgs/internal/cerr"
-	"github.com/akeemjenkins/higgs/internal/email"
-	"github.com/akeemjenkins/higgs/internal/imaptest"
+	"github.com/higgscli/higgs/internal/cerr"
+	"github.com/higgscli/higgs/internal/email"
+	"github.com/higgscli/higgs/internal/imaptest"
 )
 
 // mkAttachmentMessage synthesises a multipart/mixed RFC822 with one text

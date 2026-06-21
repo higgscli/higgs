@@ -15,7 +15,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/akeemjenkins/higgs/internal/ollama"
+	"github.com/higgscli/higgs/internal/ollama"
 )
 
 // scriptedLLM is a fake ChatFunc that returns canned responses in order.

@@ -23,3 +23,7 @@ coverage.html
 
 # stale dev artifacts
 /classification-dry-run-review.md
+
+# site build artifacts
+site/node_modules/
+site/.wrangler/

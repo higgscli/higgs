@@ -57,4 +57,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Makefile targets: `build`, `test`, `test-race`, `cover`, `cover-html`,
   `vet`, `vuln`, `check`, `clean`, `tidy`.
 
-[Unreleased]: https://github.com/akeemjenkins/higgs/commits/main
+[Unreleased]: https://github.com/higgscli/higgs/commits/main

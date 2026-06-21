@@ -2,9 +2,9 @@
 
 An agent-first CLI for Proton Mail. Schema manifest for tool use, NDJSON on stdout, typed error envelopes, and a stable exit-code enum — designed to be driven by a language model, not a human.
 
-[![CI](https://github.com/akeemjenkins/higgs/actions/workflows/ci.yml/badge.svg)](https://github.com/akeemjenkins/higgs/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/akeemjenkins/higgs?label=release&logo=github)](https://github.com/akeemjenkins/higgs/releases/latest)
-[![Go Reference](https://pkg.go.dev/badge/github.com/akeemjenkins/higgs.svg)](https://pkg.go.dev/github.com/akeemjenkins/higgs)
+[![CI](https://github.com/higgscli/higgs/actions/workflows/ci.yml/badge.svg)](https://github.com/higgscli/higgs/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/higgscli/higgs?label=release&logo=github)](https://github.com/higgscli/higgs/releases/latest)
+[![Go Reference](https://pkg.go.dev/badge/github.com/higgscli/higgs.svg)](https://pkg.go.dev/github.com/higgscli/higgs)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.25-blue?logo=go)](https://go.dev/)
 
@@ -40,15 +40,15 @@ The default model is [Gemma 4](https://ollama.com/library/gemma4), chosen becaus
 3. Install `higgs`:
    ```
    # Release tarball
-   curl -L https://github.com/akeemjenkins/higgs/releases/latest/download/higgs_1.0.2_darwin_arm64.tar.gz | tar xz
+   curl -L https://github.com/higgscli/higgs/releases/latest/download/higgs_1.0.2_darwin_arm64.tar.gz | tar xz
  
    # go install
-   go install github.com/akeemjenkins/higgs/cmd/higgs@latest
+   go install github.com/higgscli/higgs/cmd/higgs@latest
    ```
  
    Or build from source:
    ```
-   git clone https://github.com/akeemjenkins/higgs.git
+   git clone https://github.com/higgscli/higgs.git
    cd higgs
    make build
    ```
@@ -295,7 +295,7 @@ The classifier is constrained to 11 canonical labels. 612 aliases in `internal/l
 | Security | 2FA, password resets, security alerts |
 | Signups | Account creation, email verification |
  
-See [`internal/labels/data/labels.toml`](https://github.com/akeemjenkins/higgs/blob/main/internal/labels/data/labels.toml) for the full alias map.
+See [`internal/labels/data/labels.toml`](https://github.com/higgscli/higgs/blob/main/internal/labels/data/labels.toml) for the full alias map.
  
 ## Development
  
@@ -318,15 +318,15 @@ Run `make check` before opening a PR.
  
 ## Contributing
  
-Bug reports and pull requests are welcome — see [CONTRIBUTING.md](https://github.com/akeemjenkins/higgs/blob/main/CONTRIBUTING.md) for the workflow and code-review expectations.
+Bug reports and pull requests are welcome — see [CONTRIBUTING.md](https://github.com/higgscli/higgs/blob/main/CONTRIBUTING.md) for the workflow and code-review expectations.
  
 ## Security
  
-Please report vulnerabilities privately via the process in [SECURITY.md](https://github.com/akeemjenkins/higgs/blob/main/SECURITY.md). Do not open public issues for security reports.
+Please report vulnerabilities privately via the process in [SECURITY.md](https://github.com/higgscli/higgs/blob/main/SECURITY.md). Do not open public issues for security reports.
  
 ## License
  
-Apache License 2.0 — see [LICENSE](https://github.com/akeemjenkins/higgs/blob/main/LICENSE).
+Apache License 2.0 — see [LICENSE](https://github.com/higgscli/higgs/blob/main/LICENSE).
  
 ## Acknowledgements
  

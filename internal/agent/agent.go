@@ -8,7 +8,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/akeemjenkins/higgs/internal/ollama"
+	"github.com/higgscli/higgs/internal/ollama"
 )
 
 // Options configures a Run invocation.

@@ -6,10 +6,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/akeemjenkins/higgs/internal/email"
-	"github.com/akeemjenkins/higgs/internal/labels"
-	"github.com/akeemjenkins/higgs/internal/ollama"
-	"github.com/akeemjenkins/higgs/internal/termio"
+	"github.com/higgscli/higgs/internal/email"
+	"github.com/higgscli/higgs/internal/labels"
+	"github.com/higgscli/higgs/internal/ollama"
+	"github.com/higgscli/higgs/internal/termio"
 )
 
 // Result is the structured classification result from Ollama.

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/akeemjenkins/higgs/internal/cerr"
-	"github.com/akeemjenkins/higgs/internal/ollama"
+	"github.com/higgscli/higgs/internal/cerr"
+	"github.com/higgscli/higgs/internal/ollama"
 )
 
 // Highlight is one notable message surfaced by the digest.

@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/akeemjenkins/higgs/internal/cerr"
-	"github.com/akeemjenkins/higgs/internal/imaptest"
+	"github.com/higgscli/higgs/internal/cerr"
+	"github.com/higgscli/higgs/internal/imaptest"
 )
 
 func TestDigestCmdFlags(t *testing.T) {

@@ -94,7 +94,7 @@ signs:
 
 release:
   github:
-    owner: akeemjenkins
+    owner: higgscli
     name: higgs
   draft: false
   prerelease: auto
@@ -109,7 +109,7 @@ release:
        ```sh
        cosign verify-blob \
          --bundle      checksums.txt.sig \
-         --certificate-identity-regexp 'https://github.com/akeemjenkins/higgs' \
+         --certificate-identity-regexp 'https://github.com/higgscli/higgs' \
          --certificate-oidc-issuer     'https://token.actions.githubusercontent.com' \
          checksums.txt
        ```

@@ -10,9 +10,9 @@ import (
 
 	"github.com/zalando/go-keyring"
 
-	"github.com/akeemjenkins/higgs/internal/cerr"
-	"github.com/akeemjenkins/higgs/internal/config"
-	"github.com/akeemjenkins/higgs/internal/keystore"
+	"github.com/higgscli/higgs/internal/cerr"
+	"github.com/higgscli/higgs/internal/config"
+	"github.com/higgscli/higgs/internal/keystore"
 )
 
 // authTestSetup installs a file-backed keystore in t.TempDir() and neutralizes

@@ -13,7 +13,7 @@ workflow, PR expectations, and the commit convention.
 ## Setting up
 
 ```sh
-git clone https://github.com/akeemjenkins/higgs.git
+git clone https://github.com/higgscli/higgs.git
 cd personal-proton
 make build
 make test
@@ -64,7 +64,7 @@ Breaking changes use `feat!:` or `fix!:` and include a `BREAKING CHANGE:` footer
 ## Proposing a change
 
 - **Bug**: open an issue using the bug template.
-- **Feature**: open a [Discussion](https://github.com/akeemjenkins/higgs/discussions)
+- **Feature**: open a [Discussion](https://github.com/higgscli/higgs/discussions)
   first so the design can be agreed before code is written. For small additions
   (a flag, a new schema field), an issue is fine.
 

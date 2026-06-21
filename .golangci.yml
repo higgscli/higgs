@@ -30,7 +30,7 @@ linters:
       # cleanup, and Fprint* to in-process buffers/stderr. Real write errors are
       # surfaced where they matter (e.g. explicit flush/commit paths).
       exclude-functions:
-        - (*github.com/akeemjenkins/higgs/internal/state.DB).Close
+        - (*github.com/higgscli/higgs/internal/state.DB).Close
         - (*database/sql.DB).Close
         - (*database/sql.Rows).Close
         - (*os.File).Close

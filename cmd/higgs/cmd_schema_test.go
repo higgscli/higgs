@@ -8,8 +8,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/akeemjenkins/higgs/internal/cerr"
-	"github.com/akeemjenkins/higgs/internal/termio"
+	"github.com/higgscli/higgs/internal/cerr"
+	"github.com/higgscli/higgs/internal/termio"
 )
 
 // syncWriter serializes Write calls so multiple goroutines may share a

@@ -14,7 +14,7 @@ Only the latest minor release receives security fixes.
 **Do not open a public GitHub issue for security reports.**
 
 Use GitHub's private vulnerability reporting:
-<https://github.com/akeemjenkins/higgs/security/advisories/new>
+<https://github.com/higgscli/higgs/security/advisories/new>
 
 Please include:
 

@@ -6,10 +6,10 @@ import (
 	"github.com/emersion/go-imap"
 	"github.com/spf13/cobra"
 
-	"github.com/akeemjenkins/higgs/internal/cerr"
-	"github.com/akeemjenkins/higgs/internal/config"
-	"github.com/akeemjenkins/higgs/internal/smtp"
-	"github.com/akeemjenkins/higgs/internal/termio"
+	"github.com/higgscli/higgs/internal/cerr"
+	"github.com/higgscli/higgs/internal/config"
+	"github.com/higgscli/higgs/internal/smtp"
+	"github.com/higgscli/higgs/internal/termio"
 )
 
 type sendFlags struct {

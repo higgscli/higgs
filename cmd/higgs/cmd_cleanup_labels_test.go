@@ -3,8 +3,8 @@ package main
 import (
 	"testing"
 
-	"github.com/akeemjenkins/higgs/internal/cerr"
-	"github.com/akeemjenkins/higgs/internal/labels"
+	"github.com/higgscli/higgs/internal/cerr"
+	"github.com/higgscli/higgs/internal/labels"
 )
 
 func TestCleanupLabelsCmdFlags(t *testing.T) {

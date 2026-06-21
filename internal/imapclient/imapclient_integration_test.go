@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/akeemjenkins/higgs/internal/config"
-	"github.com/akeemjenkins/higgs/internal/imapclient"
-	"github.com/akeemjenkins/higgs/internal/imaptest"
+	"github.com/higgscli/higgs/internal/config"
+	"github.com/higgscli/higgs/internal/imapclient"
+	"github.com/higgscli/higgs/internal/imaptest"
 )
 
 func containsAny(s string, subs ...string) bool {

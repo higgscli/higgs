@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/akeemjenkins/higgs/internal/cerr"
+	"github.com/higgscli/higgs/internal/cerr"
 )
 
 func TestDigest_Success(t *testing.T) {

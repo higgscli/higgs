@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/akeemjenkins/higgs/internal/cerr"
-	"github.com/akeemjenkins/higgs/internal/ollama"
+	"github.com/higgscli/higgs/internal/cerr"
+	"github.com/higgscli/higgs/internal/ollama"
 )
 
 // Summary is the structured output of the summarize verb.

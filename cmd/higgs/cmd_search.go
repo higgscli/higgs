@@ -6,13 +6,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/akeemjenkins/higgs/internal/cerr"
-	"github.com/akeemjenkins/higgs/internal/config"
-	"github.com/akeemjenkins/higgs/internal/imapclient"
-	"github.com/akeemjenkins/higgs/internal/imapfetch"
-	"github.com/akeemjenkins/higgs/internal/imapsearch"
-	"github.com/akeemjenkins/higgs/internal/imaputil"
-	"github.com/akeemjenkins/higgs/internal/termio"
+	"github.com/higgscli/higgs/internal/cerr"
+	"github.com/higgscli/higgs/internal/config"
+	"github.com/higgscli/higgs/internal/imapclient"
+	"github.com/higgscli/higgs/internal/imapfetch"
+	"github.com/higgscli/higgs/internal/imapsearch"
+	"github.com/higgscli/higgs/internal/imaputil"
+	"github.com/higgscli/higgs/internal/termio"
 )
 
 type searchFlags struct {

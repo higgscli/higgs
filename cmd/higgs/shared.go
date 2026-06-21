@@ -7,8 +7,8 @@ import (
 
 	"github.com/emersion/go-imap"
 
-	"github.com/akeemjenkins/higgs/internal/email"
-	"github.com/akeemjenkins/higgs/internal/imapfetch"
+	"github.com/higgscli/higgs/internal/email"
+	"github.com/higgscli/higgs/internal/imapfetch"
 )
 
 // envelopeFrom extracts the first From address string from an IMAP envelope.

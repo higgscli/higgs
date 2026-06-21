@@ -10,9 +10,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/akeemjenkins/higgs/internal/cerr"
-	"github.com/akeemjenkins/higgs/internal/keystore"
-	"github.com/akeemjenkins/higgs/internal/termio"
+	"github.com/higgscli/higgs/internal/cerr"
+	"github.com/higgscli/higgs/internal/keystore"
+	"github.com/higgscli/higgs/internal/termio"
 )
 
 type IMAPSecurity string

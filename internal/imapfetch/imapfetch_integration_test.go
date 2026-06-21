@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/akeemjenkins/higgs/internal/imapclient"
-	"github.com/akeemjenkins/higgs/internal/imapfetch"
-	"github.com/akeemjenkins/higgs/internal/imaptest"
+	"github.com/higgscli/higgs/internal/imapclient"
+	"github.com/higgscli/higgs/internal/imapfetch"
+	"github.com/higgscli/higgs/internal/imaptest"
 )
 
 func rfc822(subject, from string) []byte {

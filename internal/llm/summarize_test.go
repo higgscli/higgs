@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/akeemjenkins/higgs/internal/cerr"
+	"github.com/higgscli/higgs/internal/cerr"
 )
 
 func newChatServer(t *testing.T, content string) (*httptest.Server, *atomic.Value) {

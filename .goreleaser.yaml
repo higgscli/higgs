@@ -65,7 +65,7 @@ brews:
       email: 41898282+github-actions[bot]@users.noreply.github.com
     commit_msg_template: "Brew formula update for {{ .ProjectName }} {{ .Tag }}"
     homepage: "https://github.com/higgscli/higgs"
-    description: "Agent-first CLI for Proton Mail — schema manifest, NDJSON, typed errors, stable exit codes"
+    description: "Agent-first CLI for Proton Mail with schema, NDJSON and typed errors"
     license: "Apache-2.0"
     skip_upload: auto
     install: |

@@ -38,10 +38,11 @@ The default model is [Gemma 4](https://ollama.com/library/gemma4), chosen becaus
    ollama pull gemma4
    ```
 3. Install `higgs`:
-   ```
-   # Release tarball
-   curl -L https://github.com/higgscli/higgs/releases/latest/download/higgs_1.0.2_darwin_arm64.tar.gz | tar xz
- 
+   ```bash
+   # Homebrew (macOS & Linux)
+   brew tap higgscli/higgs
+   brew install higgs
+
    # go install
    go install github.com/higgscli/higgs/cmd/higgs@latest
    ```

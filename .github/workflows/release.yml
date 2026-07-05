@@ -89,6 +89,19 @@ jobs:
           } >> "$GITHUB_ENV"
           echo "macOS signing credentials prepared at $d"
 
+      - name: Mint tap token
+        # Short-lived (1h) installation token from the tap-publisher GitHub App,
+        # scoped to Contents:write on higgscli/homebrew-higgs only. Replaces the
+        # former TAP_GITHUB_TOKEN PAT. Skipped when the app isn't configured.
+        if: ${{ vars.TAP_APP_ID != '' }}
+        id: tap-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.TAP_APP_ID }}
+          private-key: ${{ secrets.TAP_APP_PRIVATE_KEY }}
+          owner: higgscli
+          repositories: homebrew-higgs
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@5daf1e915a5f0af01ddbcd89a43b8061ff4f1a89 # v7
         with:
@@ -97,6 +110,6 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Fine-grained PAT with write access to higgscli/homebrew-higgs.
-          # Falls back to GITHUB_TOKEN if unset (formula won't be pushed to tap).
-          TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+          # Falls back to GITHUB_TOKEN if the app isn't configured (formula
+          # push to the tap will be skipped/fail, the release still publishes).
+          TAP_GITHUB_TOKEN: ${{ steps.tap-token.outputs.token || secrets.GITHUB_TOKEN }}

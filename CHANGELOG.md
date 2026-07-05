@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.7] - 2026-07-05
+
+### Fixed
+
+- macOS binaries are signed (Developer ID Application, hardened runtime) and
+  notarized again — the signing secrets were lost in a repo transfer, so
+  v1.0.5 and v1.0.6 shipped unsigned darwin binaries. Homebrew installs were
+  unaffected; direct downloads hit Gatekeeper warnings.
+- Release automation writes the Homebrew formula into the tap's `Formula/`
+  directory; goreleaser's default put it at the tap root, which brew ignores
+  when `Formula/` exists (v1.0.6's tap update was reconciled manually).
+
 ## [1.0.6] - 2026-07-05
 
 ### Fixed

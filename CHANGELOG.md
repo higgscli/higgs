@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.5] - 2026-07-05
+
 ### Fixed
 
 - `search`/`--all-matching` no longer trust a single `UID SEARCH` answer.
@@ -34,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The COPY+STORE+EXPUNGE fallback after a failed `UID MOVE` now narrows to the
   UIDs still present in the source, so a partially applied MOVE can no longer
   produce duplicate messages in the destination.
+
+## [1.0.0] - 2026-04-19
 
 ### Added
 

@@ -2,9 +2,11 @@ package imapwrite
 
 import (
 	"fmt"
+	"sync/atomic"
 	"testing"
 
 	"github.com/emersion/go-imap"
+	"github.com/emersion/go-imap/backend"
 
 	"github.com/higgscli/higgs/internal/imapclient"
 	"github.com/higgscli/higgs/internal/imaptest"
@@ -186,6 +188,64 @@ func TestMoveVerifiedReportsFailures(t *testing.T) {
 	}
 	if err := Move(c, "INBOX", "NoSuchMailbox", []uint32{1, 2}); err == nil {
 		t.Error("Move should report messages still present in source")
+	}
+}
+
+// silentWriteMailbox acknowledges COPY/STORE/EXPUNGE without applying them
+// once armed — the failure mode observed with Proton Bridge on large MOVE
+// batches, where the server answers OK but leaves messages in place.
+type silentWriteMailbox struct {
+	backend.Mailbox
+	armed *atomic.Bool
+}
+
+func (m *silentWriteMailbox) CopyMessages(uid bool, seq *imap.SeqSet, dest string) error {
+	if m.armed.Load() {
+		return nil
+	}
+	return m.Mailbox.CopyMessages(uid, seq, dest)
+}
+
+func (m *silentWriteMailbox) UpdateMessagesFlags(uid bool, seq *imap.SeqSet, op imap.FlagsOp, flags []string) error {
+	if m.armed.Load() {
+		return nil
+	}
+	return m.Mailbox.UpdateMessagesFlags(uid, seq, op, flags)
+}
+
+func (m *silentWriteMailbox) Expunge() error {
+	if m.armed.Load() {
+		return nil
+	}
+	return m.Mailbox.Expunge()
+}
+
+func TestMoveVerifiedDetectsSilentlyIgnoredWrites(t *testing.T) {
+	var lie atomic.Bool
+	srv := imaptest.Start(t,
+		imaptest.WithMailbox("INBOX", []imaptest.Message{
+			{RFC822: seedMsg("A")},
+			{RFC822: seedMsg("B")},
+		}),
+		imaptest.WithMailbox("Archive", nil),
+		imaptest.WithMailboxWrapper(func(m backend.Mailbox) backend.Mailbox {
+			return &silentWriteMailbox{Mailbox: m, armed: &lie}
+		}),
+	)
+	lie.Store(true)
+	c := dial(t, srv)
+	res, err := MoveVerified(c, "INBOX", "Archive", []uint32{1, 2})
+	if err != nil {
+		t.Fatalf("MoveVerified: %v", err)
+	}
+	if len(res.Moved) != 0 {
+		t.Errorf("server never applied the writes, yet %v reported moved", res.Moved)
+	}
+	if len(res.Failed) != 2 {
+		t.Errorf("failed=%v, want both UIDs", res.Failed)
+	}
+	if err := Move(c, "INBOX", "Archive", []uint32{1, 2}); err == nil {
+		t.Error("Move must not report success when the server ignores writes")
 	}
 }
 

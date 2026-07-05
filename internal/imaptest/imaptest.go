@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/emersion/go-imap"
+	"github.com/emersion/go-imap/backend"
 	"github.com/emersion/go-imap/backend/memory"
 	"github.com/emersion/go-imap/client"
 	"github.com/emersion/go-imap/server"
@@ -50,7 +51,8 @@ type seed struct {
 }
 
 type options struct {
-	seeds []seed
+	seeds       []seed
+	mailboxWrap func(backend.Mailbox) backend.Mailbox
 }
 
 // WithMailbox seeds an additional mailbox with the given messages (appended
@@ -60,6 +62,56 @@ func WithMailbox(name string, msgs []Message) Option {
 	return func(o *options) {
 		o.seeds = append(o.seeds, seed{name: name, msgs: msgs})
 	}
+}
+
+// WithMailboxWrapper decorates every backend mailbox the server hands to a
+// session, letting tests inject misbehavior a real server can exhibit but the
+// honest memory backend never does (e.g. acknowledging writes without
+// applying them, or returning unstable SEARCH results). Note that seeding via
+// WithMailbox flows through the same wrapper, so wrappers that break writes
+// should stay dormant until Start returns (gate on an atomic the test flips).
+func WithMailboxWrapper(wrap func(backend.Mailbox) backend.Mailbox) Option {
+	return func(o *options) {
+		o.mailboxWrap = wrap
+	}
+}
+
+type wrappedBackend struct {
+	inner backend.Backend
+	wrap  func(backend.Mailbox) backend.Mailbox
+}
+
+func (b *wrappedBackend) Login(ci *imap.ConnInfo, username, password string) (backend.User, error) {
+	u, err := b.inner.Login(ci, username, password)
+	if err != nil {
+		return nil, err
+	}
+	return &wrappedUser{User: u, wrap: b.wrap}, nil
+}
+
+type wrappedUser struct {
+	backend.User
+	wrap func(backend.Mailbox) backend.Mailbox
+}
+
+func (u *wrappedUser) GetMailbox(name string) (backend.Mailbox, error) {
+	m, err := u.User.GetMailbox(name)
+	if err != nil {
+		return nil, err
+	}
+	return u.wrap(m), nil
+}
+
+func (u *wrappedUser) ListMailboxes(subscribed bool) ([]backend.Mailbox, error) {
+	ms, err := u.User.ListMailboxes(subscribed)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]backend.Mailbox, len(ms))
+	for i, m := range ms {
+		out[i] = u.wrap(m)
+	}
+	return out, nil
 }
 
 // Start boots an in-memory IMAP server on 127.0.0.1:0 and registers a t.Cleanup
@@ -72,7 +124,10 @@ func Start(t testing.TB, opts ...Option) *Server {
 		fn(o)
 	}
 
-	bkd := memory.New()
+	var bkd backend.Backend = memory.New()
+	if o.mailboxWrap != nil {
+		bkd = &wrappedBackend{inner: bkd, wrap: o.mailboxWrap}
+	}
 	s := server.New(bkd)
 	s.AllowInsecureAuth = true
 	// Keep idle connections out of the way; tests run quickly.

@@ -53,6 +53,7 @@ type seed struct {
 type options struct {
 	seeds       []seed
 	mailboxWrap func(backend.Mailbox) backend.Mailbox
+	userWrap    func(backend.User) backend.User
 }
 
 // WithMailbox seeds an additional mailbox with the given messages (appended
@@ -76,9 +77,19 @@ func WithMailboxWrapper(wrap func(backend.Mailbox) backend.Mailbox) Option {
 	}
 }
 
+// WithUserWrapper decorates the backend user handed to each session, letting
+// tests inject failures for user-level operations (CREATE/DELETE/RENAME
+// mailbox). Seeding flows through the same wrapper — see WithMailboxWrapper.
+func WithUserWrapper(wrap func(backend.User) backend.User) Option {
+	return func(o *options) {
+		o.userWrap = wrap
+	}
+}
+
 type wrappedBackend struct {
-	inner backend.Backend
-	wrap  func(backend.Mailbox) backend.Mailbox
+	inner       backend.Backend
+	mailboxWrap func(backend.Mailbox) backend.Mailbox
+	userWrap    func(backend.User) backend.User
 }
 
 func (b *wrappedBackend) Login(ci *imap.ConnInfo, username, password string) (backend.User, error) {
@@ -86,7 +97,13 @@ func (b *wrappedBackend) Login(ci *imap.ConnInfo, username, password string) (ba
 	if err != nil {
 		return nil, err
 	}
-	return &wrappedUser{User: u, wrap: b.wrap}, nil
+	if b.mailboxWrap != nil {
+		u = &wrappedUser{User: u, wrap: b.mailboxWrap}
+	}
+	if b.userWrap != nil {
+		u = b.userWrap(u)
+	}
+	return u, nil
 }
 
 type wrappedUser struct {
@@ -125,8 +142,8 @@ func Start(t testing.TB, opts ...Option) *Server {
 	}
 
 	var bkd backend.Backend = memory.New()
-	if o.mailboxWrap != nil {
-		bkd = &wrappedBackend{inner: bkd, wrap: o.mailboxWrap}
+	if o.mailboxWrap != nil || o.userWrap != nil {
+		bkd = &wrappedBackend{inner: bkd, mailboxWrap: o.mailboxWrap, userWrap: o.userWrap}
 	}
 	s := server.New(bkd)
 	s.AllowInsecureAuth = true

@@ -50,6 +50,24 @@ func SearchUIDs(c *client.Client, since time.Time, unseenOnly bool) ([]uint32, e
 	return uids, nil
 }
 
+// MissingUIDs returns the requested UIDs that are absent from the fetch
+// result. A server silently returns nothing for UIDs that don't exist in the
+// mailbox, so callers reporting per-UID outcomes must account for these
+// explicitly rather than treating the fetched set as the requested set.
+func MissingUIDs(requested []uint32, got []FetchedMessage) []uint32 {
+	present := make(map[uint32]struct{}, len(got))
+	for _, m := range got {
+		present[m.UID] = struct{}{}
+	}
+	var missing []uint32
+	for _, uid := range requested {
+		if _, ok := present[uid]; !ok {
+			missing = append(missing, uid)
+		}
+	}
+	return missing
+}
+
 // FetchRFC822 fetches full RFC822 (BODY.PEEK[]) for the given UIDs. Same items as Bridge clientFetch.
 func FetchRFC822(c *client.Client, uids []uint32) ([]FetchedMessage, error) {
 	if len(uids) == 0 {
@@ -58,16 +76,19 @@ func FetchRFC822(c *client.Client, uids []uint32) ([]FetchedMessage, error) {
 	seqSet := &imap.SeqSet{}
 	seqSet.AddNum(uids...)
 	resCh := make(chan *imap.Message, len(uids))
+	errCh := make(chan error, 1)
 	go func() {
-		if err := c.UidFetch(seqSet, []imap.FetchItem{imap.FetchFlags, imap.FetchEnvelope, imap.FetchUid, "BODY.PEEK[]"}, resCh); err != nil {
-			// Channel is closed by client after send; if err is set, we still get partial results
-			_ = err
-		}
+		errCh <- c.UidFetch(seqSet, []imap.FetchItem{imap.FetchFlags, imap.FetchEnvelope, imap.FetchUid, "BODY.PEEK[]"}, resCh)
 	}()
 
 	var msgs []*imap.Message
 	for m := range resCh {
 		msgs = append(msgs, m)
+	}
+	// A FETCH that fails mid-stream still delivers partial results on resCh;
+	// swallowing the error here would report a truncated read as complete.
+	if err := <-errCh; err != nil {
+		return nil, fmt.Errorf("UID FETCH: %w", err)
 	}
 
 	out := make([]FetchedMessage, 0, len(msgs))

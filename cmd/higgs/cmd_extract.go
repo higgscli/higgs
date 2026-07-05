@@ -118,7 +118,11 @@ func cmdExtract(mailbox, schemaFile, preset, uidsFlag, model string) error {
 
 	tio := termio.Default()
 	ctx := context.Background()
-	var failed int
+	failed, err := reportMissingUIDs(tio, resolved, uids, fetched)
+	if err != nil {
+		return err
+	}
+	succeeded := 0
 	for _, f := range fetched {
 		m := fetchedToLLMMessage(f, resolved)
 		data, eErr := llm.Extract(ctx, cfg.Ollama.BaseURL, model, m, schema)
@@ -142,11 +146,12 @@ func cmdExtract(mailbox, schemaFile, preset, uidsFlag, model string) error {
 		}); err != nil {
 			return cerr.Internal(err, "write NDJSON")
 		}
+		succeeded++
 	}
 	return tio.PrintNDJSON(map[string]any{
 		"type":    "summary",
 		"mailbox": resolved,
-		"count":   len(fetched) - failed,
+		"count":   succeeded,
 		"failed":  failed,
 	})
 }

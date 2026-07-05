@@ -281,3 +281,24 @@ func TestSanitizeMailboxForPath(t *testing.T) {
 		t.Errorf("got %q", got)
 	}
 }
+
+func TestCmdAttachmentsReportsMissingUIDs(t *testing.T) {
+	srv := imaptest.Start(t, imaptest.WithMailbox("INBOX", []imaptest.Message{
+		{RFC822: mkAttachmentMessage("A", "a@x.com", "report.pdf", "see attached")},
+	}))
+	applyTestConfig(t, srv)
+
+	outDir := t.TempDir()
+	// UID 999 does not exist: the server returns nothing for it, so without
+	// explicit accounting it silently vanishes from the output.
+	stdout, err := runAttachments(t, "INBOX", "--uid", "1,999", "--out", outDir)
+	if err != nil {
+		t.Fatalf("attachments: %v (%s)", err, stdout)
+	}
+	if !strings.Contains(stdout, `"type":"error"`) || !strings.Contains(stdout, `"uid":999`) {
+		t.Errorf("missing error row for absent uid 999: %s", stdout)
+	}
+	if !strings.Contains(stdout, `"failed":1`) {
+		t.Errorf("summary should count the absent uid as failed: %s", stdout)
+	}
+}

@@ -1,9 +1,15 @@
 package main
 
 import (
+	"errors"
+	"strings"
+	"sync/atomic"
 	"testing"
 
+	"github.com/emersion/go-imap/backend"
+
 	"github.com/higgscli/higgs/internal/cerr"
+	"github.com/higgscli/higgs/internal/imaptest"
 	"github.com/higgscli/higgs/internal/labels"
 )
 
@@ -82,5 +88,47 @@ func TestCleanupLabelsTaxonomyWired(t *testing.T) {
 		if got != wantName {
 			t.Errorf("alias %q: got %q, want %q", alias, got, wantName)
 		}
+	}
+}
+
+type deleteFailUser struct {
+	backend.User
+	armed *atomic.Bool
+}
+
+func (u *deleteFailUser) DeleteMailbox(name string) error {
+	if u.armed.Load() {
+		return errors.New("DELETE rejected by server")
+	}
+	return u.User.DeleteMailbox(name)
+}
+
+func TestCleanupLabelsReportsFailedDelete(t *testing.T) {
+	var fail atomic.Bool
+	// "Labels/shipping" is an alias of the canonical "Orders" label, so the
+	// cleanup pass will try to consolidate it; empty means the flow goes
+	// straight to DELETE, which the wrapper rejects.
+	srv := imaptest.Start(t,
+		imaptest.WithMailbox("Labels/shipping", nil),
+		imaptest.WithUserWrapper(func(u backend.User) backend.User {
+			return &deleteFailUser{User: u, armed: &fail}
+		}),
+	)
+	applyTestConfig(t, srv)
+	fail.Store(true)
+	root := newRootCmd()
+	root.SetArgs([]string{"cleanup-labels"})
+	stdout, err := captureStdout(t, func() error { return root.Execute() })
+	if err != nil {
+		t.Fatalf("cleanup-labels: %v (%s)", err, stdout)
+	}
+	if !strings.Contains(stdout, `"status":"failed"`) {
+		t.Errorf("failed DELETE must not be reported as ok: %s", stdout)
+	}
+	if !strings.Contains(stdout, `"failed":1`) {
+		t.Errorf("summary must count the failed delete: %s", stdout)
+	}
+	if strings.Contains(stdout, `"status":"ok"`) {
+		t.Errorf("no ok row should be emitted for a label that failed to delete: %s", stdout)
 	}
 }

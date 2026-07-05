@@ -23,28 +23,104 @@ func MarkRead(c *client.Client, mailbox string, uids []uint32, read bool) error 
 	return SetFlag(c, mailbox, uids, imap.SeenFlag, read)
 }
 
-// SetFlag adds or removes a flag (system or custom keyword) on the UID set.
+// FlagResult is the verified per-UID outcome of SetFlagVerified.
+type FlagResult struct {
+	// Updated holds UIDs confirmed to be in the requested flag state.
+	Updated []uint32
+	// Failed holds UIDs still in the wrong state after a retry, plus UIDs not
+	// present in the mailbox at all — STORE on a nonexistent UID is silently
+	// ignored by servers.
+	Failed []uint32
+}
+
+// SetFlag adds or removes a flag (system or custom keyword) on the UID set,
+// verified. Returns an error unless every UID was confirmed updated.
 func SetFlag(c *client.Client, mailbox string, uids []uint32, flag string, add bool) error {
+	res, err := SetFlagVerified(c, mailbox, uids, flag, add)
+	if err != nil {
+		return err
+	}
+	if n := len(res.Failed); n > 0 {
+		return fmt.Errorf("UID STORE %s %q on %q: %d of %d messages not updated", storeOpString(add), flag, mailbox, n, len(uids))
+	}
+	return nil
+}
+
+// SetFlagVerified applies the flag change in chunks of MoveChunkSize and
+// confirms each chunk with UID SEARCH before reporting it updated — servers
+// can acknowledge a STORE without applying it, and silently ignore UIDs that
+// don't exist. UIDs still in the wrong state after one retry land in Failed.
+// A non-nil error means the operation aborted early; the result reflects
+// everything verified up to that point, with the rest in Failed.
+func SetFlagVerified(c *client.Client, mailbox string, uids []uint32, flag string, add bool) (*FlagResult, error) {
 	flag = strings.TrimSpace(flag)
 	if flag == "" {
-		return fmt.Errorf("empty flag")
+		return nil, fmt.Errorf("empty flag")
 	}
+	res := &FlagResult{}
 	if len(uids) == 0 {
-		return nil
+		return res, nil
 	}
 	if _, err := c.Select(mailbox, false); err != nil {
-		return fmt.Errorf("SELECT %q: %w", mailbox, err)
+		res.Failed = uids
+		return res, fmt.Errorf("SELECT %q: %w", mailbox, err)
 	}
 	op := imap.FormatFlagsOp(imap.AddFlags, true)
 	if !add {
 		op = imap.FormatFlagsOp(imap.RemoveFlags, true)
 	}
+	store := func(set []uint32) error {
+		seq := &imap.SeqSet{}
+		seq.AddNum(set...)
+		return c.UidStore(seq, op, []interface{}{flag}, nil)
+	}
+	for start := 0; start < len(uids); start += MoveChunkSize {
+		chunk := uids[start:min(start+MoveChunkSize, len(uids))]
+		attemptErr := store(chunk)
+		remaining, err := wrongFlagState(c, chunk, flag, add)
+		if err != nil {
+			res.Failed = append(res.Failed, uids[start:]...)
+			if attemptErr != nil {
+				return res, fmt.Errorf("STORE chunk on %q: %v; verify: %w", mailbox, attemptErr, err)
+			}
+			return res, fmt.Errorf("verify STORE on %q: %w", mailbox, err)
+		}
+		if len(remaining) > 0 {
+			// Retry just the stragglers once, then re-verify.
+			_ = store(remaining)
+			remaining, err = wrongFlagState(c, remaining, flag, add)
+			if err != nil {
+				res.Failed = append(res.Failed, uids[start:]...)
+				return res, fmt.Errorf("verify STORE retry on %q: %w", mailbox, err)
+			}
+		}
+		res.Updated = append(res.Updated, subtractUIDs(chunk, remaining)...)
+		res.Failed = append(res.Failed, remaining...)
+	}
+	return res, nil
+}
+
+// wrongFlagState returns the subset of uids not in the desired flag state in
+// the currently selected mailbox: messages still lacking (add) or still
+// carrying (remove) the flag, plus UIDs missing from the mailbox entirely.
+func wrongFlagState(c *client.Client, uids []uint32, flag string, add bool) ([]uint32, error) {
+	present, err := presentUIDs(c, uids)
+	if err != nil {
+		return nil, err
+	}
 	seq := &imap.SeqSet{}
 	seq.AddNum(uids...)
-	if err := c.UidStore(seq, op, []interface{}{flag}, nil); err != nil {
-		return fmt.Errorf("UID STORE %s %q on %q: %w", storeOpString(add), flag, mailbox, err)
+	crit := &imap.SearchCriteria{Uid: seq}
+	if add {
+		crit.WithoutFlags = []string{flag}
+	} else {
+		crit.WithFlags = []string{flag}
 	}
-	return nil
+	wrong, err := c.UidSearch(crit)
+	if err != nil {
+		return nil, err
+	}
+	return append(subtractUIDs(uids, present), wrong...), nil
 }
 
 // Copy UID-copies the given UIDs from srcMailbox to dstMailbox.

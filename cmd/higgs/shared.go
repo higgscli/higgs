@@ -7,9 +7,28 @@ import (
 
 	"github.com/emersion/go-imap"
 
+	"github.com/higgscli/higgs/internal/cerr"
 	"github.com/higgscli/higgs/internal/email"
 	"github.com/higgscli/higgs/internal/imapfetch"
+	"github.com/higgscli/higgs/internal/termio"
 )
+
+// reportMissingUIDs emits a "type":"error" row for each requested UID absent
+// from a FETCH result and returns how many there were. Servers return nothing
+// for UIDs that don't exist, so commands reporting per-UID outcomes must
+// account for them or they silently vanish from the output.
+func reportMissingUIDs(w *termio.Writer, mailbox string, requested []uint32, fetched []imapfetch.FetchedMessage) (int, error) {
+	missing := imapfetch.MissingUIDs(requested, fetched)
+	for _, uid := range missing {
+		env := cerr.Validation("uid %d not found in %q", uid, mailbox).ToEnvelope()["error"]
+		if err := w.PrintNDJSON(map[string]any{
+			"type": "error", "uid": uid, "mailbox": mailbox, "error": env,
+		}); err != nil {
+			return len(missing), cerr.Internal(err, "print")
+		}
+	}
+	return len(missing), nil
+}
 
 // envelopeFrom extracts the first From address string from an IMAP envelope.
 func envelopeFrom(env *imap.Envelope) string {

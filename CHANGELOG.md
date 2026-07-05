@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `imapfetch.FetchRFC822` no longer swallows mid-stream FETCH errors: a
+  connection drop or server error during a fetch used to return the partial
+  message list with no error, so every consumer (`extract`, `classify`,
+  `summarize`, `digest`, `attachments`, `fetch-and-parse`, `unsubscribe`,
+  reply composition) treated a truncated mailbox read as complete.
+- Commands taking explicit `--uid` (`extract`, `unsubscribe`, `attachments`,
+  `summarize`) now emit a `"type":"error"` row for each requested UID the
+  server didn't return (e.g. a typo'd or already-deleted UID) and count it in
+  the summary's `failed` — previously such UIDs vanished from the output
+  entirely.
+- `mark-read`/`flag` now verify the STORE per chunk of 250 UIDs (same
+  discipline as the archive/trash/move fix): success rows are emitted only
+  for UIDs confirmed in the requested flag state, wrong-state and nonexistent
+  UIDs get error rows plus a `failed` count and a non-zero exit. Previously
+  one unverified `UID STORE` OK produced a success row for every input UID.
+- `cleanup-labels` no longer reports `"status":"ok"` for a label whose DELETE
+  the server rejected; it now emits `"status":"failed"` with the error
+  envelope (including the moved-messages count when messages had been
+  consolidated) and counts it in `failed`.
+- `watch` re-runs each poll's `UID SEARCH` until two consecutive answers
+  agree, so a single flaky answer (Proton Bridge All Mail) no longer emits a
+  burst of phantom `expunge`/`new` events.
+- `apply-labels` surfaces state-DB write failures as warnings instead of
+  discarding them (a lost `applied` record causes silent re-application on
+  the next run), and `import`'s APPEND error now labels the message index
+  correctly instead of calling it a UID.
+
 ## [1.0.5] - 2026-07-05
 
 ### Fixed

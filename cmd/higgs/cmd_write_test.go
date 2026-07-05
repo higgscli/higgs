@@ -220,3 +220,25 @@ func TestCmdMoveAllMatching(t *testing.T) {
 		t.Errorf("unexpected: %s", stdout)
 	}
 }
+
+func TestCmdMarkReadReportsMissingUIDs(t *testing.T) {
+	srv := imaptest.Start(t, imaptest.WithMailbox("INBOX", []imaptest.Message{
+		{RFC822: testMsg("X", "a@x.com")},
+	}))
+	applyTestConfig(t, srv)
+	root := newRootCmd()
+	root.SetArgs([]string{"mark-read", "INBOX", "--uid", "1,999"})
+	stdout, err := captureStdout(t, func() error { return root.Execute() })
+	if err == nil {
+		t.Fatalf("expected error for unmarked uid, output: %s", stdout)
+	}
+	if !strings.Contains(stdout, `"type":"marked"`) || !strings.Contains(stdout, `"uid":1`) {
+		t.Errorf("uid 1 should be marked: %s", stdout)
+	}
+	if !strings.Contains(stdout, `"type":"error"`) || !strings.Contains(stdout, `"uid":999`) {
+		t.Errorf("uid 999 must get an error row, not a success row: %s", stdout)
+	}
+	if !strings.Contains(stdout, `"failed":1`) {
+		t.Errorf("summary should count the failure: %s", stdout)
+	}
+}

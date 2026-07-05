@@ -131,6 +131,61 @@ func runVerifiedMove(c *client.Client, src, dst, verb, opName string, uids []uin
 	return nil
 }
 
+// runVerifiedFlag performs a verified flag change and streams per-UID rows: a
+// rowType row (e.g. "marked") only for UIDs confirmed in the requested state,
+// an "error" row for each UID that wasn't, then a summary. base is merged
+// into every row and the summary. Returns a non-nil IMAP error after printing
+// when anything failed, so the exit code reflects partial failure.
+func runVerifiedFlag(c *client.Client, mailbox string, uids []uint32, flag string, add bool, rowType, opName string, base map[string]any) error {
+	w := termio.Default()
+	res, err := imapwrite.SetFlagVerified(c, mailbox, uids, flag, add)
+	if res == nil {
+		return cerr.Validation("%s", err.Error())
+	}
+	row := func(uid uint32, typ string) map[string]any {
+		m := map[string]any{"type": typ, "uid": uid, "mailbox": mailbox}
+		for k, v := range base {
+			m[k] = v
+		}
+		return m
+	}
+	for _, uid := range res.Updated {
+		if perr := w.PrintNDJSON(row(uid, rowType)); perr != nil {
+			return cerr.Internal(perr, "print")
+		}
+	}
+	for _, uid := range res.Failed {
+		cause := err
+		if cause == nil {
+			cause = fmt.Errorf("message not in requested state after %s and one retry (or uid not present in %q)", opName, mailbox)
+		}
+		r := row(uid, "error")
+		r["error"] = cerr.IMAP(imapclient.Wrap(cause), "%s uid=%d on %q", opName, uid, mailbox).ToEnvelope()["error"]
+		if perr := w.PrintNDJSON(r); perr != nil {
+			return cerr.Internal(perr, "print")
+		}
+	}
+	summary := map[string]any{"type": "summary", "mailbox": mailbox, "count": len(res.Updated)}
+	for k, v := range base {
+		summary[k] = v
+	}
+	if len(res.Failed) > 0 {
+		summary["failed"] = len(res.Failed)
+	}
+	if perr := w.PrintNDJSON(summary); perr != nil {
+		return cerr.Internal(perr, "print")
+	}
+	if err != nil {
+		return cerr.IMAP(imapclient.Wrap(err), "%s on %q", opName, mailbox)
+	}
+	if n := len(res.Failed); n > 0 {
+		return cerr.IMAP(
+			fmt.Errorf("%d of %d messages not updated on %q", n, len(uids), mailbox),
+			"%s: partial failure", opName)
+	}
+	return nil
+}
+
 // dialAndResolve opens an IMAP connection and resolves mailbox + targets.
 // Caller owns defer-close of the returned client.
 func dialAndResolve(t *writeTarget, mailboxArg string) (*client.Client, string, []uint32, error) {

@@ -35,14 +35,18 @@ func TestMarkReadAndSeen(t *testing.T) {
 	if _, err := c.Select("INBOX", false); err != nil {
 		t.Fatalf("select: %v", err)
 	}
-	if err := MarkRead(c, "INBOX", []uint32{1, 2}, true); err != nil {
+	if err := MarkRead(c, "INBOX", []uint32{1}, true); err != nil {
 		t.Fatalf("MarkRead: %v", err)
 	}
-	if err := MarkRead(c, "INBOX", []uint32{1, 2}, false); err != nil {
+	if err := MarkRead(c, "INBOX", []uint32{1}, false); err != nil {
 		t.Fatalf("MarkRead unread: %v", err)
 	}
 	if err := MarkRead(c, "INBOX", nil, true); err != nil {
 		t.Errorf("nil uids should be a no-op, got %v", err)
+	}
+	// A UID that doesn't exist must not be reported as marked.
+	if err := MarkRead(c, "INBOX", []uint32{1, 2}, true); err == nil {
+		t.Error("MarkRead with a nonexistent UID should error, not claim success")
 	}
 }
 
@@ -57,7 +61,7 @@ func TestSetFlagValidation(t *testing.T) {
 func TestSetFlagCustomKeyword(t *testing.T) {
 	srv := imaptest.Start(t, imaptest.WithMailbox("INBOX", []imaptest.Message{{RFC822: seedMsg("x")}}))
 	c := dial(t, srv)
-	if err := SetFlag(c, "INBOX", []uint32{1, 2}, imap.FlaggedFlag, true); err != nil {
+	if err := SetFlag(c, "INBOX", []uint32{1}, imap.FlaggedFlag, true); err != nil {
 		t.Fatalf("set flagged: %v", err)
 	}
 }
@@ -263,5 +267,62 @@ func TestSubtractUIDs(t *testing.T) {
 func TestStoreOpString(t *testing.T) {
 	if storeOpString(true) != "+" || storeOpString(false) != "-" {
 		t.Errorf("unexpected op strings")
+	}
+}
+
+func TestSetFlagVerifiedDetectsSilentlyIgnoredStore(t *testing.T) {
+	var lie atomic.Bool
+	srv := imaptest.Start(t,
+		imaptest.WithMailbox("INBOX", []imaptest.Message{
+			{RFC822: seedMsg("A")},
+			{RFC822: seedMsg("B")},
+		}),
+		imaptest.WithMailboxWrapper(func(m backend.Mailbox) backend.Mailbox {
+			return &silentWriteMailbox{Mailbox: m, armed: &lie}
+		}),
+	)
+	lie.Store(true)
+	c := dial(t, srv)
+	res, err := SetFlagVerified(c, "INBOX", []uint32{1, 2}, imap.FlaggedFlag, true)
+	if err != nil {
+		t.Fatalf("SetFlagVerified: %v", err)
+	}
+	if len(res.Updated) != 0 {
+		t.Errorf("server never applied the STORE, yet %v reported updated", res.Updated)
+	}
+	if len(res.Failed) != 2 {
+		t.Errorf("failed=%v, want both UIDs", res.Failed)
+	}
+}
+
+func TestSetFlagVerifiedReportsMissingUIDs(t *testing.T) {
+	srv := imaptest.Start(t, imaptest.WithMailbox("INBOX", []imaptest.Message{
+		{RFC822: seedMsg("A")},
+	}))
+	c := dial(t, srv)
+	res, err := SetFlagVerified(c, "INBOX", []uint32{1, 999}, imap.FlaggedFlag, true)
+	if err != nil {
+		t.Fatalf("SetFlagVerified: %v", err)
+	}
+	if len(res.Updated) != 1 || res.Updated[0] != 1 {
+		t.Errorf("updated=%v, want [1]", res.Updated)
+	}
+	if len(res.Failed) != 1 || res.Failed[0] != 999 {
+		t.Errorf("failed=%v, want [999] — a nonexistent UID must not be reported as flagged", res.Failed)
+	}
+}
+
+func TestSetFlagVerifiedRemoveFlag(t *testing.T) {
+	srv := imaptest.Start(t, imaptest.WithMailbox("INBOX", []imaptest.Message{
+		{RFC822: seedMsg("A"), Flags: []string{imap.SeenFlag}},
+		{RFC822: seedMsg("B"), Flags: []string{imap.SeenFlag}},
+	}))
+	c := dial(t, srv)
+	res, err := SetFlagVerified(c, "INBOX", []uint32{1, 2}, imap.SeenFlag, false)
+	if err != nil {
+		t.Fatalf("SetFlagVerified remove: %v", err)
+	}
+	if len(res.Updated) != 2 || len(res.Failed) != 0 {
+		t.Errorf("updated=%v failed=%v, want both updated", res.Updated, res.Failed)
 	}
 }

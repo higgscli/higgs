@@ -169,7 +169,11 @@ func cmdSummarize(mailbox string, a summarizeArgs) error {
 		})
 	}
 
-	var failed int
+	failed, err := reportMissingUIDs(tio, resolved, targetUIDs, fetched)
+	if err != nil {
+		return err
+	}
+	succeeded := 0
 	for _, f := range fetched {
 		msg := fetchedToLLMMessage(f, resolved)
 		sum, sErr := llm.Summarize(ctx, cfg.Ollama.BaseURL, model, msg, opts)
@@ -193,11 +197,12 @@ func cmdSummarize(mailbox string, a summarizeArgs) error {
 		}); err != nil {
 			return cerr.Internal(err, "write NDJSON")
 		}
+		succeeded++
 	}
 	return tio.PrintNDJSON(map[string]any{
 		"type":    "summary",
 		"mailbox": resolved,
-		"count":   len(fetched) - failed,
+		"count":   succeeded,
 		"failed":  failed,
 	})
 }

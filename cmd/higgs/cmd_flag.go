@@ -5,7 +5,6 @@ import (
 
 	"github.com/higgscli/higgs/internal/cerr"
 	"github.com/higgscli/higgs/internal/imapclient"
-	"github.com/higgscli/higgs/internal/imapwrite"
 	"github.com/higgscli/higgs/internal/termio"
 )
 
@@ -64,19 +63,5 @@ func cmdFlag(mailbox string, t *writeTarget, addFlag, removeFlag string, dryRun 
 			"type": "summary", "mailbox": resolved, "op": op, "flag": flag, "planned": len(uids),
 		})
 	}
-	if len(uids) > 0 {
-		if err := imapwrite.SetFlag(c, resolved, uids, flag, op == "add"); err != nil {
-			return cerr.IMAP(imapclient.Wrap(err), "UID STORE %s %q", op, flag)
-		}
-	}
-	for _, uid := range uids {
-		if err := w.PrintNDJSON(map[string]any{
-			"type": "flagged", "uid": uid, "mailbox": resolved, "op": op, "flag": flag,
-		}); err != nil {
-			return cerr.Internal(err, "print")
-		}
-	}
-	return w.PrintNDJSON(map[string]any{
-		"type": "summary", "mailbox": resolved, "op": op, "flag": flag, "count": len(uids),
-	})
+	return runVerifiedFlag(c, resolved, uids, flag, op == "add", "flagged", "FLAG", map[string]any{"op": op, "flag": flag})
 }

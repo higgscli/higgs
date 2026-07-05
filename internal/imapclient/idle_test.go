@@ -3,10 +3,12 @@ package imapclient
 import (
 	"bytes"
 	"context"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/emersion/go-imap"
+	"github.com/emersion/go-imap/backend"
 	"github.com/emersion/go-imap/client"
 
 	"github.com/higgscli/higgs/internal/imaptest"
@@ -221,4 +223,66 @@ func expungeUID(c *client.Client, uid uint32) error {
 		return err
 	}
 	return c.Expunge(nil)
+}
+
+// flakySnapshotMailbox answers exactly one SEARCH (once armed) with a
+// truncated result, then answers honestly — the instability observed against
+// Proton Bridge's virtual All Mail mailbox.
+type flakySnapshotMailbox struct {
+	backend.Mailbox
+	armed *atomic.Bool
+	lied  *atomic.Bool
+}
+
+func (m *flakySnapshotMailbox) SearchMessages(uid bool, crit *imap.SearchCriteria) ([]uint32, error) {
+	res, err := m.Mailbox.SearchMessages(uid, crit)
+	if err != nil {
+		return nil, err
+	}
+	if m.armed.Load() && m.lied.CompareAndSwap(false, true) && len(res) > 1 {
+		return res[:1], nil
+	}
+	return res, nil
+}
+
+func TestWatch_NoPhantomEventsFromFlakySearch(t *testing.T) {
+	var armed, lied atomic.Bool
+	srv := imaptest.Start(t,
+		imaptest.WithMailbox("INBOX", []imaptest.Message{
+			{RFC822: idleTestMsg("S0", "a@x.com", 1)},
+			{RFC822: idleTestMsg("S1", "b@x.com", 2)},
+			{RFC822: idleTestMsg("S2", "c@x.com", 3)},
+		}),
+		imaptest.WithMailboxWrapper(func(m backend.Mailbox) backend.Mailbox {
+			return &flakySnapshotMailbox{Mailbox: m, armed: &armed, lied: &lied}
+		}),
+	)
+	watcher, err := Dial(imaptest.Config(srv))
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer CloseAndLogout(watcher)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2500*time.Millisecond)
+	defer cancel()
+	events, errs, err := Watch(ctx, watcher, "INBOX", 30*time.Millisecond)
+	if err != nil {
+		t.Fatalf("watch: %v", err)
+	}
+	// Arm after the initial snapshot has settled so the lie lands on a poll.
+	time.Sleep(100 * time.Millisecond)
+	armed.Store(true)
+
+	// The mailbox never changes: any event is a phantom caused by trusting
+	// the single flaky SEARCH answer.
+	var phantom []Event
+	for ev := range events {
+		phantom = append(phantom, ev)
+	}
+	if err := <-errs; err != nil {
+		t.Fatalf("watch error: %v", err)
+	}
+	if len(phantom) > 0 {
+		t.Errorf("flaky SEARCH produced %d phantom events (first: %+v); an unchanged mailbox must produce none", len(phantom), phantom[0])
+	}
 }

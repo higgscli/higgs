@@ -191,13 +191,20 @@ func cmdCleanupLabels(dryRun bool) error {
 
 		if status.Messages == 0 {
 			termio.Info("Empty mailbox, deleting")
-			if err := c.Delete(item.Old); err != nil {
-				if imapclient.IsConnectionError(imapclient.Wrap(err)) {
-					if rerr := reconnect(err.Error()); rerr != nil {
-						return rerr
-					}
+			deleteErr := c.Delete(item.Old)
+			if deleteErr != nil && imapclient.IsConnectionError(imapclient.Wrap(deleteErr)) {
+				if rerr := reconnect(deleteErr.Error()); rerr != nil {
+					return rerr
 				}
-				termio.Warn("DELETE %q: %v", item.Old, err)
+				deleteErr = c.Delete(item.Old)
+			}
+			if deleteErr != nil {
+				termio.Warn("DELETE %q: %v", item.Old, deleteErr)
+				if werr := writeFailRow(item, "DELETE", deleteErr); werr != nil {
+					return cerr.Internal(werr, "write NDJSON")
+				}
+				failed++
+				continue
 			}
 			if werr := tio.PrintNDJSON(map[string]any{
 				"label":          item.Old,
@@ -310,21 +317,31 @@ func cmdCleanupLabels(dryRun bool) error {
 				termio.Warn("CLOSE: %v", err)
 			}
 		}
-		if err := c.Delete(item.Old); err != nil {
-			if imapclient.IsConnectionError(imapclient.Wrap(err)) {
-				if rerr := reconnect(err.Error()); rerr != nil {
-					return rerr
-				}
-				err = c.Delete(item.Old)
+		deleteErr := c.Delete(item.Old)
+		if deleteErr != nil && imapclient.IsConnectionError(imapclient.Wrap(deleteErr)) {
+			if rerr := reconnect(deleteErr.Error()); rerr != nil {
+				return rerr
 			}
-			if err != nil {
-				termio.Warn("DELETE %q: %v", item.Old, err)
-			} else {
-				termio.Info("Deleted old label %s", item.Old)
-			}
-		} else {
-			termio.Info("Deleted old label %s", item.Old)
+			deleteErr = c.Delete(item.Old)
 		}
+		if deleteErr != nil {
+			// The messages were moved but the old label remains — reporting
+			// "ok" here would hide the leftover mailbox from consumers.
+			termio.Warn("DELETE %q: %v", item.Old, deleteErr)
+			wrapped := cerr.IMAP(imapclient.Wrap(deleteErr), "DELETE %q after moving %d messages: %s", item.Old, msgsMoved, deleteErr.Error())
+			if werr := tio.PrintNDJSON(map[string]any{
+				"label":          item.Old,
+				"canonical":      item.New,
+				"messages_moved": msgsMoved,
+				"status":         "failed",
+				"error":          cerr.From(wrapped).ToEnvelope()["error"],
+			}); werr != nil {
+				return cerr.Internal(werr, "write NDJSON")
+			}
+			failed++
+			continue
+		}
+		termio.Info("Deleted old label %s", item.Old)
 
 		if werr := tio.PrintNDJSON(map[string]any{
 			"label":          item.Old,

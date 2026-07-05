@@ -415,3 +415,22 @@ func TestParseMailto(t *testing.T) {
 		t.Error("expected not-mailto error")
 	}
 }
+
+func TestCmdUnsubscribeReportsMissingUIDs(t *testing.T) {
+	srv := imaptest.Start(t, imaptest.WithMailbox("INBOX", []imaptest.Message{
+		{RFC822: testMsg("x", "a@x.com")},
+	}))
+	applyTestConfig(t, srv)
+	root := newRootCmd()
+	root.SetArgs([]string{"unsubscribe", "INBOX", "--uid", "999", "--dry-run"})
+	stdout, err := captureStdout(t, func() error { return root.Execute() })
+	if err != nil {
+		t.Fatalf("unsubscribe: %v (%s)", err, stdout)
+	}
+	if !strings.Contains(stdout, `"type":"error"`) || !strings.Contains(stdout, `"uid":999`) {
+		t.Errorf("missing error row for absent uid 999: %s", stdout)
+	}
+	if !strings.Contains(stdout, `"failed":1`) {
+		t.Errorf("summary should count the absent uid as failed: %s", stdout)
+	}
+}

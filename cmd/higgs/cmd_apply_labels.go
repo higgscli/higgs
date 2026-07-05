@@ -157,7 +157,7 @@ func cmdApplyLabels(mailbox string, limitFlag int, dryRun bool) error {
 
 	for i, msg := range unapplied {
 		if len(msg.SuggestedLabels) == 0 {
-			_ = stateDB.MarkLabelsApplied(mailbox, snap.UIDValidity, msg.UID, true, "")
+			markApplied(stateDB, mailbox, snap.UIDValidity, msg.UID, true, "")
 			if err := tio.PrintNDJSON(map[string]any{
 				"uid":     msg.UID,
 				"labels":  []string{},
@@ -188,7 +188,7 @@ func cmdApplyLabels(mailbox string, limitFlag int, dryRun bool) error {
 
 		if applyErr != nil {
 			termio.Error("Failed uid=%d: %v", msg.UID, applyErr)
-			_ = stateDB.MarkLabelsApplied(mailbox, snap.UIDValidity, msg.UID, false, applyErr.Error())
+			markApplied(stateDB, mailbox, snap.UIDValidity, msg.UID, false, applyErr.Error())
 			rowErr := cerr.IMAP(imapclient.Wrap(applyErr), "%s", applyErr.Error())
 			if err := tio.PrintNDJSON(map[string]any{
 				"uid":     msg.UID,
@@ -201,7 +201,7 @@ func cmdApplyLabels(mailbox string, limitFlag int, dryRun bool) error {
 			failedCount++
 		} else {
 			termio.Info("Applied uid=%d", msg.UID)
-			_ = stateDB.MarkLabelsApplied(mailbox, snap.UIDValidity, msg.UID, true, "")
+			markApplied(stateDB, mailbox, snap.UIDValidity, msg.UID, true, "")
 			if err := tio.PrintNDJSON(map[string]any{
 				"uid":     msg.UID,
 				"labels":  msg.SuggestedLabels,
@@ -222,4 +222,13 @@ func cmdApplyLabels(mailbox string, limitFlag int, dryRun bool) error {
 
 	termio.Info("Apply complete: applied=%d failed=%d", applied, failedCount)
 	return tio.PrintNDJSON(summary)
+}
+
+// markApplied records apply state, surfacing (rather than swallowing) DB
+// write failures: a lost applied=true record means the message is re-applied
+// on the next run.
+func markApplied(db *state.DB, mailbox string, uidValidity, uid uint32, applied bool, applyErr string) {
+	if err := db.MarkLabelsApplied(mailbox, uidValidity, uid, applied, applyErr); err != nil {
+		termio.Warn("state DB: record applied=%v for uid=%d failed: %v", applied, uid, err)
+	}
 }

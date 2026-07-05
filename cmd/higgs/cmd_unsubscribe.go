@@ -156,6 +156,13 @@ func cmdUnsubscribe(mailbox string, f *unsubscribeFlags) error {
 	attempted, succeeded, failed, skipped := 0, 0, 0, 0
 	from := cfg.IMAP.Username
 
+	missing, err := reportMissingUIDs(w, resolved, uids, msgs)
+	if err != nil {
+		return err
+	}
+	attempted += missing
+	failed += missing
+
 	for _, m := range msgs {
 		attempted++
 		hdr, _ := parseRFC5322Headers(m.RFC822)

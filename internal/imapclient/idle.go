@@ -137,17 +137,54 @@ func sendEvent(ctx context.Context, ch chan<- Event, ev Event) bool {
 	}
 }
 
-// snapshotUIDs selects the mailbox read-only and returns the sorted UID set.
+// snapshotUIDs selects the mailbox read-only and returns the sorted UID set,
+// re-running UID SEARCH until two consecutive runs agree. A single flaky
+// SEARCH answer (seen with Proton Bridge's virtual All Mail) would otherwise
+// diff against the previous snapshot as a burst of phantom expunge/new
+// events. Mirrors imapsearch's stability loop, kept local to avoid an
+// imapclient→imapsearch dependency inversion.
 func snapshotUIDs(c *client.Client, mailbox string) ([]uint32, error) {
 	if _, err := c.Select(mailbox, true); err != nil {
 		return nil, err
 	}
+	const maxRuns = 5
+	prev, err := sortedUIDSearch(c)
+	if err != nil {
+		return nil, err
+	}
+	for run := 1; run < maxRuns; run++ {
+		cur, err := sortedUIDSearch(c)
+		if err != nil {
+			return nil, err
+		}
+		if uidSetsEqual(prev, cur) {
+			return cur, nil
+		}
+		prev = cur
+		time.Sleep(200 * time.Millisecond)
+	}
+	return prev, nil
+}
+
+func sortedUIDSearch(c *client.Client) ([]uint32, error) {
 	uids, err := c.UidSearch(&imap.SearchCriteria{})
 	if err != nil {
 		return nil, err
 	}
 	sort.Slice(uids, func(i, j int) bool { return uids[i] < uids[j] })
 	return uids, nil
+}
+
+func uidSetsEqual(a, b []uint32) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 type watchError string

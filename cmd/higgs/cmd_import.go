@@ -153,7 +153,7 @@ func runImport(c *client.Client, mailbox string, src io.Reader, format formatKin
 			date = time.Now().UTC()
 		}
 		if err := c.Append(mailbox, msg.flags, date, bytes.NewReader(msg.body)); err != nil {
-			return cerr.IMAP(imapclient.Wrap(err), "APPEND uid=%d into %q", index, mailbox)
+			return cerr.IMAP(imapclient.Wrap(err), "APPEND message %d into %q", index, mailbox)
 		}
 		imported++
 		if err := w.PrintNDJSON(map[string]any{

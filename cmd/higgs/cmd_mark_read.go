@@ -1,11 +1,11 @@
 package main
 
 import (
+	"github.com/emersion/go-imap"
 	"github.com/spf13/cobra"
 
 	"github.com/higgscli/higgs/internal/cerr"
 	"github.com/higgscli/higgs/internal/imapclient"
-	"github.com/higgscli/higgs/internal/imapwrite"
 	"github.com/higgscli/higgs/internal/termio"
 )
 
@@ -54,19 +54,5 @@ func cmdMarkRead(mailbox string, t *writeTarget, unread, dryRun bool) error {
 			"type": "summary", "mailbox": resolved, "state": state, "planned": len(uids),
 		})
 	}
-	if len(uids) > 0 {
-		if err := imapwrite.MarkRead(c, resolved, uids, !unread); err != nil {
-			return cerr.IMAP(imapclient.Wrap(err), "UID STORE \\Seen")
-		}
-	}
-	for _, uid := range uids {
-		if err := w.PrintNDJSON(map[string]any{
-			"type": "marked", "uid": uid, "mailbox": resolved, "state": state,
-		}); err != nil {
-			return cerr.Internal(err, "print")
-		}
-	}
-	return w.PrintNDJSON(map[string]any{
-		"type": "summary", "mailbox": resolved, "state": state, "count": len(uids),
-	})
+	return runVerifiedFlag(c, resolved, uids, imap.SeenFlag, !unread, "marked", "MARK-READ", map[string]any{"state": state})
 }

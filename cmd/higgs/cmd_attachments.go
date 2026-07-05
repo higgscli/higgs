@@ -100,6 +100,11 @@ func cmdAttachments(mailbox string, f *attachmentFlags) error {
 
 	w := termio.Default()
 	extracted, skipped, failed := 0, 0, 0
+	missing, err := reportMissingUIDs(w, resolved, uids, msgs)
+	if err != nil {
+		return err
+	}
+	failed += missing
 
 	filter := func(a parse.Attachment) bool {
 		if f.filenameGlob != "" {

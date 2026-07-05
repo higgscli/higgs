@@ -50,19 +50,5 @@ func cmdTrash(src, target string, t *writeTarget, dryRun bool) error {
 			"type": "summary", "src": resolved, "dst": target, "planned": len(uids),
 		})
 	}
-	if len(uids) > 0 {
-		if err := imapwrite.Trash(c, resolved, uids, target); err != nil {
-			return cerr.IMAP(imapclient.Wrap(err), "TRASH %q→%q", resolved, target)
-		}
-	}
-	for _, uid := range uids {
-		if err := w.PrintNDJSON(map[string]any{
-			"type": "trashed", "uid": uid, "src": resolved, "dst": target,
-		}); err != nil {
-			return cerr.Internal(err, "print")
-		}
-	}
-	return w.PrintNDJSON(map[string]any{
-		"type": "summary", "src": resolved, "dst": target, "trashed": len(uids),
-	})
+	return runVerifiedMove(c, resolved, target, "trashed", "TRASH", uids)
 }

@@ -142,6 +142,51 @@ func TestCmdArchiveDryRun(t *testing.T) {
 	}
 }
 
+func TestCmdArchiveHappy(t *testing.T) {
+	srv := imaptest.Start(t,
+		imaptest.WithMailbox("INBOX", []imaptest.Message{{RFC822: testMsg("x", "a@x.com")}}),
+		imaptest.WithMailbox("Archive", nil),
+	)
+	applyTestConfig(t, srv)
+	root := newRootCmd()
+	root.SetArgs([]string{"archive", "INBOX", "--uid", "1"})
+	stdout, err := captureStdout(t, func() error { return root.Execute() })
+	if err != nil {
+		t.Fatalf("archive: %v (%s)", err, stdout)
+	}
+	if !strings.Contains(stdout, `"type":"archived"`) || !strings.Contains(stdout, `"archived":1`) {
+		t.Errorf("missing archived rows: %s", stdout)
+	}
+	if strings.Contains(stdout, `"type":"error"`) {
+		t.Errorf("unexpected error rows: %s", stdout)
+	}
+}
+
+func TestCmdArchivePartialFailureIsReported(t *testing.T) {
+	srv := imaptest.Start(t, imaptest.WithMailbox("INBOX", []imaptest.Message{
+		{RFC822: testMsg("x", "a@x.com")},
+	}))
+	applyTestConfig(t, srv)
+	root := newRootCmd()
+	// Nonexistent target: the message stays in INBOX, which must surface as
+	// per-UID error rows and a non-nil (non-zero exit) command error — never
+	// as "archived".
+	root.SetArgs([]string{"archive", "INBOX", "--uid", "1", "--target", "NoSuchMailbox"})
+	stdout, err := captureStdout(t, func() error { return root.Execute() })
+	if err == nil {
+		t.Fatalf("expected error for unmoved messages, output: %s", stdout)
+	}
+	if cerr.From(err).Kind != cerr.KindIMAP {
+		t.Errorf("kind=%v want imap", cerr.From(err).Kind)
+	}
+	if !strings.Contains(stdout, `"type":"error"`) || !strings.Contains(stdout, `"failed":1`) {
+		t.Errorf("missing error/failed rows: %s", stdout)
+	}
+	if strings.Contains(stdout, `"type":"archived"`) {
+		t.Errorf("must not claim archived for unmoved UIDs: %s", stdout)
+	}
+}
+
 func TestCmdTrashDryRun(t *testing.T) {
 	srv := imaptest.Start(t, imaptest.WithMailbox("INBOX", []imaptest.Message{
 		{RFC822: testMsg("x", "a@x.com")},

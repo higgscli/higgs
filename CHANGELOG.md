@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `archive`/`trash`/`move` no longer report success without verifying it.
+  Previously a single MOVE was issued for the whole UID set and every UID was
+  logged as `archived`/`trashed`/`moved` as long as the server answered OK —
+  with large batches (10k+ UIDs) Proton Bridge acknowledges the command while
+  applying it only partially, silently leaving messages behind. Moves now run
+  in chunks of 250 UIDs, each chunk is verified with `UID SEARCH` against the
+  source mailbox, stragglers are retried once, and UIDs still present are
+  emitted as `"type":"error"` rows with a `failed` count in the summary and a
+  non-zero exit code.
+- The COPY+STORE+EXPUNGE fallback after a failed `UID MOVE` now narrows to the
+  UIDs still present in the source, so a partially applied MOVE can no longer
+  produce duplicate messages in the destination.
+
 ### Added
 
 - Initial public release of `higgs`.

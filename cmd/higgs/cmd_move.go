@@ -5,7 +5,6 @@ import (
 
 	"github.com/higgscli/higgs/internal/cerr"
 	"github.com/higgscli/higgs/internal/imapclient"
-	"github.com/higgscli/higgs/internal/imapwrite"
 	"github.com/higgscli/higgs/internal/termio"
 )
 
@@ -49,22 +48,5 @@ func cmdMove(src, dst string, t *writeTarget, dryRun bool) error {
 			"type": "summary", "src": resolvedSrc, "dst": dst, "planned": len(uids),
 		})
 	}
-	if len(uids) == 0 {
-		return w.PrintNDJSON(map[string]any{
-			"type": "summary", "src": resolvedSrc, "dst": dst, "moved": 0,
-		})
-	}
-	if err := imapwrite.Move(c, resolvedSrc, dst, uids); err != nil {
-		return cerr.IMAP(imapclient.Wrap(err), "MOVE %q→%q", resolvedSrc, dst)
-	}
-	for _, uid := range uids {
-		if err := w.PrintNDJSON(map[string]any{
-			"type": "moved", "uid": uid, "src": resolvedSrc, "dst": dst,
-		}); err != nil {
-			return cerr.Internal(err, "print")
-		}
-	}
-	return w.PrintNDJSON(map[string]any{
-		"type": "summary", "src": resolvedSrc, "dst": dst, "moved": len(uids),
-	})
+	return runVerifiedMove(c, resolvedSrc, dst, "moved", "MOVE", uids)
 }

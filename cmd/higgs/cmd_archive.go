@@ -50,19 +50,5 @@ func cmdArchive(src, target string, t *writeTarget, dryRun bool) error {
 			"type": "summary", "src": resolved, "dst": target, "planned": len(uids),
 		})
 	}
-	if len(uids) > 0 {
-		if err := imapwrite.Archive(c, resolved, uids, target); err != nil {
-			return cerr.IMAP(imapclient.Wrap(err), "ARCHIVE %q→%q", resolved, target)
-		}
-	}
-	for _, uid := range uids {
-		if err := w.PrintNDJSON(map[string]any{
-			"type": "archived", "uid": uid, "src": resolved, "dst": target,
-		}); err != nil {
-			return cerr.Internal(err, "print")
-		}
-	}
-	return w.PrintNDJSON(map[string]any{
-		"type": "summary", "src": resolved, "dst": target, "archived": len(uids),
-	})
+	return runVerifiedMove(c, resolved, target, "archived", "ARCHIVE", uids)
 }

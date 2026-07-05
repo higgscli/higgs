@@ -1,6 +1,7 @@
 package imapwrite
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/emersion/go-imap"
@@ -109,6 +110,93 @@ func TestTrashDefault(t *testing.T) {
 	}
 	if err := Trash(c, "INBOX", []uint32{1, 2}, ""); err != nil {
 		t.Fatalf("trash: %v", err)
+	}
+}
+
+func TestMoveVerifiedHappy(t *testing.T) {
+	srv := imaptest.Start(t, imaptest.WithMailbox("INBOX", []imaptest.Message{
+		{RFC822: seedMsg("A")},
+		{RFC822: seedMsg("B")},
+	}))
+	c := dial(t, srv)
+	if err := c.Create("Archive"); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	res, err := MoveVerified(c, "INBOX", "Archive", []uint32{1, 2})
+	if err != nil {
+		t.Fatalf("MoveVerified: %v", err)
+	}
+	if len(res.Moved) != 2 || len(res.Failed) != 0 {
+		t.Fatalf("got moved=%v failed=%v, want 2 moved 0 failed", res.Moved, res.Failed)
+	}
+	remaining, err := presentUIDs(c, []uint32{1, 2})
+	if err != nil {
+		t.Fatalf("presentUIDs: %v", err)
+	}
+	if len(remaining) != 0 {
+		t.Errorf("messages still present in INBOX after verified move: %v", remaining)
+	}
+}
+
+func TestMoveVerifiedChunks(t *testing.T) {
+	n := MoveChunkSize + 10
+	msgs := make([]imaptest.Message, n)
+	for i := range msgs {
+		msgs[i] = imaptest.Message{RFC822: seedMsg(fmt.Sprintf("m%d", i))}
+	}
+	srv := imaptest.Start(t, imaptest.WithMailbox("INBOX", msgs))
+	c := dial(t, srv)
+	if err := c.Create("Archive"); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	uids := make([]uint32, n)
+	for i := range uids {
+		uids[i] = uint32(i + 1)
+	}
+	res, err := MoveVerified(c, "INBOX", "Archive", uids)
+	if err != nil {
+		t.Fatalf("MoveVerified: %v", err)
+	}
+	if len(res.Moved) != n || len(res.Failed) != 0 {
+		t.Fatalf("got %d moved %d failed, want %d moved 0 failed", len(res.Moved), len(res.Failed), n)
+	}
+	remaining, err := presentUIDs(c, uids)
+	if err != nil {
+		t.Fatalf("presentUIDs: %v", err)
+	}
+	if len(remaining) != 0 {
+		t.Errorf("%d messages still present in INBOX after verified move", len(remaining))
+	}
+}
+
+func TestMoveVerifiedReportsFailures(t *testing.T) {
+	srv := imaptest.Start(t, imaptest.WithMailbox("INBOX", []imaptest.Message{
+		{RFC822: seedMsg("A")},
+		{RFC822: seedMsg("B")},
+	}))
+	c := dial(t, srv)
+	// Destination does not exist: every attempt is rejected, so verification
+	// must report the messages as still present rather than moved.
+	res, err := MoveVerified(c, "INBOX", "NoSuchMailbox", []uint32{1, 2})
+	if err != nil {
+		t.Fatalf("MoveVerified should recover from per-chunk errors, got %v", err)
+	}
+	if len(res.Moved) != 0 || len(res.Failed) != 2 {
+		t.Fatalf("got moved=%v failed=%v, want 0 moved 2 failed", res.Moved, res.Failed)
+	}
+	if err := Move(c, "INBOX", "NoSuchMailbox", []uint32{1, 2}); err == nil {
+		t.Error("Move should report messages still present in source")
+	}
+}
+
+func TestSubtractUIDs(t *testing.T) {
+	got := subtractUIDs([]uint32{1, 2, 3, 4}, []uint32{2, 4})
+	if len(got) != 2 || got[0] != 1 || got[1] != 3 {
+		t.Errorf("subtractUIDs = %v, want [1 3]", got)
+	}
+	all := []uint32{5, 6}
+	if got := subtractUIDs(all, nil); len(got) != 2 {
+		t.Errorf("subtract nil = %v, want unchanged", got)
 	}
 }
 

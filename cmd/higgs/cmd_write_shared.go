@@ -13,6 +13,8 @@ import (
 	"github.com/higgscli/higgs/internal/imapclient"
 	"github.com/higgscli/higgs/internal/imapsearch"
 	"github.com/higgscli/higgs/internal/imaputil"
+	"github.com/higgscli/higgs/internal/imapwrite"
+	"github.com/higgscli/higgs/internal/termio"
 )
 
 // writeTarget represents the set of UIDs to operate on, either explicit or
@@ -82,6 +84,51 @@ func resolveTarget(c *client.Client, t *writeTarget, mailbox string) ([]uint32, 
 		uids = uids[len(uids)-t.searchFlags.limit:]
 	}
 	return uids, nil
+}
+
+// runVerifiedMove performs a verified move and streams per-UID rows: a verb
+// row (e.g. "archived") only for UIDs confirmed gone from the source mailbox,
+// an "error" row for each UID that remained, then a summary with both counts.
+// Returns a non-nil IMAP error after printing when anything failed, so the
+// exit code reflects partial failure.
+func runVerifiedMove(c *client.Client, src, dst, verb, opName string, uids []uint32) error {
+	w := termio.Default()
+	res, err := imapwrite.MoveVerified(c, src, dst, uids)
+	for _, uid := range res.Moved {
+		if perr := w.PrintNDJSON(map[string]any{
+			"type": verb, "uid": uid, "src": src, "dst": dst,
+		}); perr != nil {
+			return cerr.Internal(perr, "print")
+		}
+	}
+	for _, uid := range res.Failed {
+		cause := err
+		if cause == nil {
+			cause = fmt.Errorf("message still present in %q after %s and one retry", src, opName)
+		}
+		env := cerr.IMAP(imapclient.Wrap(cause), "%s uid=%d %q→%q", opName, uid, src, dst).ToEnvelope()["error"]
+		if perr := w.PrintNDJSON(map[string]any{
+			"type": "error", "uid": uid, "src": src, "dst": dst, "error": env,
+		}); perr != nil {
+			return cerr.Internal(perr, "print")
+		}
+	}
+	summary := map[string]any{"type": "summary", "src": src, "dst": dst, verb: len(res.Moved)}
+	if len(res.Failed) > 0 {
+		summary["failed"] = len(res.Failed)
+	}
+	if perr := w.PrintNDJSON(summary); perr != nil {
+		return cerr.Internal(perr, "print")
+	}
+	if err != nil {
+		return cerr.IMAP(imapclient.Wrap(err), "%s %q→%q", opName, src, dst)
+	}
+	if n := len(res.Failed); n > 0 {
+		return cerr.IMAP(
+			fmt.Errorf("%d of %d messages still present in %q after retry", n, len(uids), src),
+			"%s %q→%q: partial failure", opName, src, dst)
+	}
+	return nil
 }
 
 // dialAndResolve opens an IMAP connection and resolves mailbox + targets.

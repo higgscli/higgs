@@ -55,6 +55,9 @@ archives:
 
 brews:
   - name: higgs
+    # brew only scans Formula/ when the directory exists; goreleaser's
+    # default (tap root) leaves installs pointing at the old formula.
+    directory: Formula
     repository:
       owner: higgscli
       name: homebrew-higgs

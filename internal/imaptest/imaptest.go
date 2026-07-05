@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"fmt"
 	"net"
+	"sync"
 	"testing"
 	"time"
 
@@ -86,6 +87,157 @@ func WithUserWrapper(wrap func(backend.User) backend.User) Option {
 	}
 }
 
+// lockedBackend serializes every backend call behind one mutex. go-imap's
+// memory backend has no internal locking, so two concurrent connections (e.g.
+// a Watch poller SELECTing while another client APPENDs) race on mailbox
+// state — caught by -race on CI.
+type lockedBackend struct {
+	inner backend.Backend
+	mu    *sync.Mutex
+}
+
+func (b *lockedBackend) Login(ci *imap.ConnInfo, username, password string) (backend.User, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	u, err := b.inner.Login(ci, username, password)
+	if err != nil {
+		return nil, err
+	}
+	return &lockedUser{inner: u, mu: b.mu}, nil
+}
+
+type lockedUser struct {
+	inner backend.User
+	mu    *sync.Mutex
+}
+
+func (u *lockedUser) Username() string {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	return u.inner.Username()
+}
+
+func (u *lockedUser) ListMailboxes(subscribed bool) ([]backend.Mailbox, error) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	ms, err := u.inner.ListMailboxes(subscribed)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]backend.Mailbox, len(ms))
+	for i, m := range ms {
+		out[i] = &lockedMailbox{inner: m, mu: u.mu}
+	}
+	return out, nil
+}
+
+func (u *lockedUser) GetMailbox(name string) (backend.Mailbox, error) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	m, err := u.inner.GetMailbox(name)
+	if err != nil {
+		return nil, err
+	}
+	return &lockedMailbox{inner: m, mu: u.mu}, nil
+}
+
+func (u *lockedUser) CreateMailbox(name string) error {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	return u.inner.CreateMailbox(name)
+}
+
+func (u *lockedUser) DeleteMailbox(name string) error {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	return u.inner.DeleteMailbox(name)
+}
+
+func (u *lockedUser) RenameMailbox(existingName, newName string) error {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	return u.inner.RenameMailbox(existingName, newName)
+}
+
+func (u *lockedUser) Logout() error {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	return u.inner.Logout()
+}
+
+type lockedMailbox struct {
+	inner backend.Mailbox
+	mu    *sync.Mutex
+}
+
+func (m *lockedMailbox) Name() string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.inner.Name()
+}
+
+func (m *lockedMailbox) Info() (*imap.MailboxInfo, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.inner.Info()
+}
+
+func (m *lockedMailbox) Status(items []imap.StatusItem) (*imap.MailboxStatus, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.inner.Status(items)
+}
+
+func (m *lockedMailbox) SetSubscribed(subscribed bool) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.inner.SetSubscribed(subscribed)
+}
+
+func (m *lockedMailbox) Check() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.inner.Check()
+}
+
+func (m *lockedMailbox) ListMessages(uid bool, seq *imap.SeqSet, items []imap.FetchItem, ch chan<- *imap.Message) error {
+	// The channel consumer runs concurrently but never takes this mutex, so
+	// holding it across the (synchronous) inner call cannot deadlock.
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.inner.ListMessages(uid, seq, items, ch)
+}
+
+func (m *lockedMailbox) SearchMessages(uid bool, criteria *imap.SearchCriteria) ([]uint32, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.inner.SearchMessages(uid, criteria)
+}
+
+func (m *lockedMailbox) CreateMessage(flags []string, date time.Time, body imap.Literal) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.inner.CreateMessage(flags, date, body)
+}
+
+func (m *lockedMailbox) UpdateMessagesFlags(uid bool, seq *imap.SeqSet, operation imap.FlagsOp, flags []string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.inner.UpdateMessagesFlags(uid, seq, operation, flags)
+}
+
+func (m *lockedMailbox) CopyMessages(uid bool, seq *imap.SeqSet, dest string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.inner.CopyMessages(uid, seq, dest)
+}
+
+func (m *lockedMailbox) Expunge() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.inner.Expunge()
+}
+
 type wrappedBackend struct {
 	inner       backend.Backend
 	mailboxWrap func(backend.Mailbox) backend.Mailbox
@@ -141,7 +293,9 @@ func Start(t testing.TB, opts ...Option) *Server {
 		fn(o)
 	}
 
-	var bkd backend.Backend = memory.New()
+	// Serialize all backend access: the memory backend is not thread-safe and
+	// tests routinely run two concurrent connections (watcher + appender).
+	var bkd backend.Backend = &lockedBackend{inner: memory.New(), mu: &sync.Mutex{}}
 	if o.mailboxWrap != nil || o.userWrap != nil {
 		bkd = &wrappedBackend{inner: bkd, mailboxWrap: o.mailboxWrap, userWrap: o.userWrap}
 	}

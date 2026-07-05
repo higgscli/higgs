@@ -36,7 +36,11 @@ func (w *Writer) PrintError(err error) {
 		_, _ = w.out.Write(b)
 		_, _ = w.out.Write([]byte("\n"))
 	}
-	_, _ = fmt.Fprintf(w.errw, "error[%s]: %s\n", e.Kind.String(), e.Message)
+	summary := e.Message
+	if cause := e.causeText(); cause != "" {
+		summary += ": " + cause
+	}
+	_, _ = fmt.Fprintf(w.errw, "error[%s]: %s\n", e.Kind.String(), summary)
 }
 
 // Exit prints the error then exits with its mapped exit code.

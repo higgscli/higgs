@@ -29,6 +29,24 @@ func TestPrintErrorEnvelopeAndSummary(t *testing.T) {
 	}
 }
 
+func TestPrintErrorIncludesCause(t *testing.T) {
+	var out, errw bytes.Buffer
+	w := NewWithExit(&out, &errw, func(int) {})
+	w.PrintError(IMAP(errors.New("MOVE out of All Mail is not allowed"), "TRASH %q→%q", "All Mail", "Trash"))
+
+	if !strings.Contains(errw.String(), "MOVE out of All Mail is not allowed") {
+		t.Errorf("stderr summary should carry the cause: %q", errw.String())
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(bytes.TrimSpace(out.Bytes()), &decoded); err != nil {
+		t.Fatalf("stdout json: %v\n%s", err, out.String())
+	}
+	inner := decoded["error"].(map[string]any)
+	if inner["cause"] != "MOVE out of All Mail is not allowed" {
+		t.Errorf("envelope cause=%v", inner["cause"])
+	}
+}
+
 func TestPrintErrorNilNoop(t *testing.T) {
 	var out, errw bytes.Buffer
 	w := NewWithExit(&out, &errw, func(int) {})

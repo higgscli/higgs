@@ -2,6 +2,7 @@ package cerr
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
 )
 
@@ -26,6 +27,27 @@ func TestToEnvelopeOmitsEmptyHint(t *testing.T) {
 	}
 	if inner["code"] != 400 {
 		t.Errorf("code=%v", inner["code"])
+	}
+}
+
+func TestToEnvelopeIncludesCause(t *testing.T) {
+	cause := errors.New("ollama: parse JSON output: invalid character 'i'")
+	inner := Classify(cause, "extract").ToEnvelope()["error"].(map[string]any)
+	if inner["cause"] != cause.Error() {
+		t.Errorf("cause=%v, want underlying error text", inner["cause"])
+	}
+}
+
+func TestToEnvelopeOmitsRedundantCause(t *testing.T) {
+	cause := errors.New("boom")
+	// Message already embeds the cause text (classify-style wrapping).
+	inner := Classify(cause, "%s", cause.Error()).ToEnvelope()["error"].(map[string]any)
+	if _, has := inner["cause"]; has {
+		t.Errorf("cause should be omitted when message already contains it")
+	}
+	inner = Validation("no cause here").ToEnvelope()["error"].(map[string]any)
+	if _, has := inner["cause"]; has {
+		t.Errorf("cause should be omitted when there is no cause")
 	}
 }
 

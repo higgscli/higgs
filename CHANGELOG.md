@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `search`/`--all-matching` no longer trust a single `UID SEARCH` answer.
+  Proton Bridge's virtual "All Mail" mailbox can return different results for
+  the identical query while its view settles (observed: 122 matches, then 28
+  on immediate re-run). Searches now re-run until two consecutive runs agree
+  (up to 5 runs, warning on stderr when instability is detected).
+- Error envelopes now include a `cause` field carrying the underlying error
+  text when the message doesn't already contain it, and the stderr summary
+  appends it. Previously `extract` failures all collapsed to
+  `{"code":500,"kind":"classify","message":"extract","reason":"classifyError"}`
+  regardless of the real Ollama parse error, and IMAP errors (e.g. `trash
+  "All Mail"`) hid the server's actual rejection text. Applies to all wrapped
+  errors: extract, summarize, digest, and IMAP operations.
+
 - `archive`/`trash`/`move` no longer report success without verifying it.
   Previously a single MOVE was issued for the whole UID set and every UID was
   logged as `archived`/`trashed`/`moved` as long as the server answered OK —

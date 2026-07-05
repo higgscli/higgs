@@ -9,30 +9,32 @@ import (
 
 	"github.com/emersion/go-imap"
 	"github.com/emersion/go-imap/client"
+
+	"github.com/higgscli/higgs/internal/termio"
 )
 
 // Criteria is a high-level search specification. Zero values are ignored.
 type Criteria struct {
-	From       string
-	To         string
-	Cc         string
-	Subject    string
-	Body       string
-	Text       string
-	Since      time.Time
-	Before     time.Time
-	SentSince  time.Time
-	SentBefore time.Time
-	LargerThan uint32
+	From        string
+	To          string
+	Cc          string
+	Subject     string
+	Body        string
+	Text        string
+	Since       time.Time
+	Before      time.Time
+	SentSince   time.Time
+	SentBefore  time.Time
+	LargerThan  uint32
 	SmallerThan uint32
-	Keywords   []string
-	Unkeywords []string
-	Seen       *bool
-	Flagged    *bool
-	Answered   *bool
-	Deleted    *bool
-	Draft      *bool
-	Recent     *bool
+	Keywords    []string
+	Unkeywords  []string
+	Seen        *bool
+	Flagged     *bool
+	Answered    *bool
+	Deleted     *bool
+	Draft       *bool
+	Recent      *bool
 }
 
 // Match is one hit returned by Search.
@@ -147,15 +149,59 @@ func Or(a, b Criteria) *imap.SearchCriteria {
 	return &imap.SearchCriteria{Or: [][2]*imap.SearchCriteria{{Build(a), Build(b)}}}
 }
 
+// Proton Bridge's virtual "All Mail" mailbox can answer the same UID SEARCH
+// with different results while its view settles (observed: identical
+// back-to-back queries returning 122 then 28 matches). stableUIDSearch
+// re-runs the search until two consecutive runs agree, so a single flaky
+// answer is never reported as the result.
+const (
+	searchStableMaxRuns = 5
+	searchStableDelay   = 500 * time.Millisecond
+)
+
+func stableUIDSearch(c *client.Client, crit *imap.SearchCriteria) ([]uint32, error) {
+	prev, err := c.UidSearch(crit)
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(prev, func(i, j int) bool { return prev[i] < prev[j] })
+	for run := 1; run < searchStableMaxRuns; run++ {
+		cur, err := c.UidSearch(crit)
+		if err != nil {
+			return nil, err
+		}
+		sort.Slice(cur, func(i, j int) bool { return cur[i] < cur[j] })
+		if equalUIDs(prev, cur) {
+			return cur, nil
+		}
+		termio.Warn("UID SEARCH returned %d then %d matches for the same query; retrying until stable", len(prev), len(cur))
+		prev = cur
+		time.Sleep(searchStableDelay)
+	}
+	termio.Warn("UID SEARCH did not stabilize after %d runs; using the last result (%d matches)", searchStableMaxRuns, len(prev))
+	return prev, nil
+}
+
+func equalUIDs(a, b []uint32) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
 // Search runs UID SEARCH against the already-selected mailbox and returns
 // ordered matches with envelope + flags + size for each hit, capped by limit
 // (0 = no cap).
 func Search(c *client.Client, crit Criteria, limit int) ([]Match, error) {
-	uids, err := c.UidSearch(Build(crit))
+	uids, err := stableUIDSearch(c, Build(crit))
 	if err != nil {
 		return nil, err
 	}
-	sort.Slice(uids, func(i, j int) bool { return uids[i] < uids[j] })
 	if limit > 0 && len(uids) > limit {
 		uids = uids[len(uids)-limit:]
 	}
@@ -167,12 +213,7 @@ func Search(c *client.Client, crit Criteria, limit int) ([]Match, error) {
 
 // SearchUIDs is like Search but returns only UIDs (no fetch).
 func SearchUIDs(c *client.Client, crit Criteria) ([]uint32, error) {
-	uids, err := c.UidSearch(Build(crit))
-	if err != nil {
-		return nil, err
-	}
-	sort.Slice(uids, func(i, j int) bool { return uids[i] < uids[j] })
-	return uids, nil
+	return stableUIDSearch(c, Build(crit))
 }
 
 func fetchEnvelopes(c *client.Client, uids []uint32) ([]Match, error) {

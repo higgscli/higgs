@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `move`/`archive`/`trash` no longer report a false `verify move ... no such
+  message` failure when the move drains the source mailbox. Proton Bridge
+  (gluon) answers a UID-referencing SEARCH on an empty mailbox with
+  `NO no such message` instead of no matches, so verifying "the moved UIDs
+  are gone" failed exactly when the move fully succeeded. Verification now
+  confirms an empty source with a criteria-less SEARCH before trusting that
+  error; genuine SEARCH failures on non-empty mailboxes still surface.
+  `mark-read`/`flag` verification against an empty mailbox is fixed the same
+  way (per-UID failure rows instead of a hard abort).
+
 ## [1.1.0] - 2026-07-09
 
 ### Added

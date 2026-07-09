@@ -116,7 +116,7 @@ func wrongFlagState(c *client.Client, uids []uint32, flag string, add bool) ([]u
 	} else {
 		crit.WithFlags = []string{flag}
 	}
-	wrong, err := c.UidSearch(crit)
+	wrong, err := uidSearch(c, crit)
 	if err != nil {
 		return nil, err
 	}
@@ -253,7 +253,29 @@ func moveOnce(c *client.Client, srcMailbox, dstMailbox string, uids []uint32) er
 func presentUIDs(c *client.Client, uids []uint32) ([]uint32, error) {
 	seq := &imap.SeqSet{}
 	seq.AddNum(uids...)
-	return c.UidSearch(&imap.SearchCriteria{Uid: seq})
+	return uidSearch(c, &imap.SearchCriteria{Uid: seq})
+}
+
+// uidSearch runs a verification UID SEARCH, tolerating a Proton Bridge
+// (gluon) quirk: a SEARCH whose criteria reference UIDs answers "NO no such
+// message" when the selected mailbox is empty, instead of matching nothing —
+// gluon resolves UID search keys against its mailbox snapshot, and that
+// resolution errors when the snapshot holds no messages. A move that drains
+// the source mailbox would then read as a verification failure even though
+// the empty source is exactly the expected outcome. On error, re-check with
+// a criteria-less SEARCH (which gluon answers normally): a provably empty
+// mailbox can match no UIDs, so report no matches; otherwise surface the
+// original error.
+func uidSearch(c *client.Client, crit *imap.SearchCriteria) ([]uint32, error) {
+	matches, err := c.UidSearch(crit)
+	if err == nil {
+		return matches, nil
+	}
+	all, allErr := c.UidSearch(&imap.SearchCriteria{})
+	if allErr == nil && len(all) == 0 {
+		return nil, nil
+	}
+	return nil, err
 }
 
 func subtractUIDs(all, remove []uint32) []uint32 {

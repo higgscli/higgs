@@ -17,12 +17,12 @@ import (
 )
 
 type attachmentFlags struct {
-	uids          string
-	out           string
-	filenameGlob  string
-	minSize       int64
-	maxSize       int64
-	dryRun        bool
+	uids         string
+	out          string
+	filenameGlob string
+	minSize      int64
+	maxSize      int64
+	dryRun       bool
 }
 
 func newAttachmentsCmd() *cobra.Command {
@@ -42,7 +42,7 @@ row per attachment, terminated by a summary line.`,
 			return cmdAttachments(args[0], f)
 		},
 	}
-	cmd.Flags().StringVar(&f.uids, "uid", "", "Comma-separated UIDs to extract from (required)")
+	cmd.Flags().StringVar(&f.uids, "uid", "", "Comma-separated UIDs to extract from ('-' reads UIDs/NDJSON from stdin; required)")
 	cmd.Flags().StringVar(&f.out, "out", "", "Output directory (default ./attachments/<mailbox>/<uid>/)")
 	cmd.Flags().StringVar(&f.filenameGlob, "filename-glob", "", "Only extract attachments whose filename matches this glob")
 	cmd.Flags().Int64Var(&f.minSize, "min-size", 0, "Only extract attachments >= N decoded bytes")
@@ -52,7 +52,7 @@ row per attachment, terminated by a summary line.`,
 }
 
 func cmdAttachments(mailbox string, f *attachmentFlags) error {
-	uids, err := parseUIDList(f.uids)
+	uids, err := resolveUIDList(f.uids)
 	if err != nil {
 		return cerr.Validation("%s", err.Error())
 	}
@@ -216,4 +216,3 @@ func sanitizeMailboxForPath(s string) string {
 	}
 	return name
 }
-

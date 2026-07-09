@@ -77,8 +77,8 @@ func wantUIDs(t *testing.T, got, want []uint32) {
 	}
 }
 
-func boolPtr(b bool) *bool          { return &b }
-func f64Ptr(f float64) *float64     { return &f }
+func boolPtr(b bool) *bool      { return &b }
+func f64Ptr(f float64) *float64 { return &f }
 
 func TestQueryAll_OrderedByMailboxThenUID(t *testing.T) {
 	db := openQueryTestDB(t)

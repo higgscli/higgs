@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-07-09
+
 ### Added
 
 - `higgs state query`: the per-message classification records the state DB
@@ -28,6 +30,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   extraction outcome directly as a persistent, searchable label (e.g.
   `--apply-as-label Needs-Reply --when needs_reply=true`) instead of
   bookkeeping JSON output and applying labels in a separate pass.
+
+### Changed
+
+- Dependency bumps: `github.com/spf13/pflag` 1.0.10, `modernc.org/sqlite`
+  1.53.0, plus GitHub Actions updates (checkout v7, setup-go v6.5,
+  golangci-lint-action v9.3, goreleaser-action v7.2.3, docker/login-action
+  v4.4, codeql-action 4.36.3).
 
 ## [1.0.7] - 2026-07-05
 

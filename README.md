@@ -130,7 +130,14 @@ higgs schema classify
  
 ## Commands
  
-The intended flow is: discover mailboxes, classify them, apply labels. Everything else (`backfill`, `cleanup-labels`, `state`) exists to repair or inspect state along the way.
+The intended flow is: discover mailboxes, classify them, apply labels. Everything else (`backfill`, `cleanup-labels`, `state`, `verify`) exists to repair or inspect state along the way.
+
+Commands compose over pipes: every command that accepts an explicit `--uid` list also accepts `--uid -`, which reads the UID set from stdin. Stdin may be plain UIDs (comma- or whitespace-separated) or NDJSON, from which each row's numeric `uid` field is taken (rows without one, like `summary` lines, are skipped). So any command's NDJSON output is directly usable as another's input:
+
+```
+higgs search INBOX --before 2025-07-01 | higgs archive INBOX --uid -
+higgs state query INBOX --is-mailing-list false | higgs move INBOX Folders/Personal --uid -
+```
  
 ### scan-folders
  
@@ -210,6 +217,25 @@ Inspect or reset the SQLite state DB.
 higgs state stats
 higgs state stats "Folders/Accounts"
 higgs state clear "Folders/Accounts"
+```
+ 
+`state query` exposes the per-message classification records `classify` persists (labels, confidence, rationale, mailing-list flag), so results stay queryable after the fact — no re-parsing saved NDJSON. It is purely local (no IMAP connection) and streams NDJSON rows whose `uid` fields pipe straight into `--uid -` consumers.
+ 
+```
+higgs state query INBOX --is-mailing-list false
+higgs state query INBOX --label Personal --min-confidence 0.8
+higgs state query --failed
+```
+ 
+Flags: `--is-mailing-list true|false`, `--applied true|false`, `--min-confidence F`, `--max-confidence F`, `--label X` (exact element match), `--failed`, `--limit N`.
+ 
+### verify
+ 
+Audit a mailbox against an expected UID set without mutating anything. `--expect present` (default) requires every given UID to exist, `--expect absent` requires none to, and `--expect exact` requires the mailbox's UID set to equal the given set. Violations stream as NDJSON rows and make the command exit non-zero.
+ 
+```
+higgs verify Archive --uid 1842,1843
+higgs search INBOX --before 2025-07-01 | higgs verify INBOX --uid - --expect absent
 ```
  
 ### schema

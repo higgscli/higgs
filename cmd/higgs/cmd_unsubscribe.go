@@ -107,7 +107,7 @@ SMTP env vars). Results stream as NDJSON with a summary terminator.`,
 			return cmdUnsubscribe(args[0], f)
 		},
 	}
-	cmd.Flags().StringVar(&f.uids, "uid", "", "Comma-separated UIDs to target (required)")
+	cmd.Flags().StringVar(&f.uids, "uid", "", "Comma-separated UIDs to target ('-' reads UIDs/NDJSON from stdin; required)")
 	cmd.Flags().BoolVar(&f.httpOnly, "http-only", false, "Only use HTTP URLs")
 	cmd.Flags().BoolVar(&f.mailtoOnly, "mailto-only", false, "Only use mailto: URIs")
 	cmd.Flags().BoolVar(&f.dryRun, "dry-run", false, "Emit the planned action without unsubscribing")
@@ -118,7 +118,7 @@ func cmdUnsubscribe(mailbox string, f *unsubscribeFlags) error {
 	if f.httpOnly && f.mailtoOnly {
 		return cerr.Validation("--http-only and --mailto-only are mutually exclusive")
 	}
-	uids, err := parseUIDList(f.uids)
+	uids, err := resolveUIDList(f.uids)
 	if err != nil {
 		return cerr.Validation("%s", err.Error())
 	}

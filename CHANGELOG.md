@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `higgs state query`: the per-message classification records the state DB
+  already keeps (suggested labels, confidence, rationale, mailing-list flag,
+  apply status) are now queryable from the CLI — filter by
+  `--is-mailing-list`, `--label`, `--min/--max-confidence`, `--applied`,
+  `--failed`, and pipe the NDJSON rows into any `--uid -` consumer.
+- `--uid -` on every command taking an explicit UID list (`archive`, `trash`,
+  `move`, `mark-read`, `flag`, `extract`, `unsubscribe`, `attachments`,
+  `summarize`, `verify`) reads the UID set from stdin: plain comma/whitespace
+  lists or NDJSON (each row's numeric `uid` field, summary rows skipped), so
+  `higgs search INBOX --before 2025-07-01 | higgs archive INBOX --uid -`
+  works without external glue scripts.
+- `higgs verify <mailbox> --uid <set|-> --expect present|absent|exact`: a
+  read-only audit primitive that diffs a mailbox against an expected UID set,
+  streams one violation row per mismatch, and exits non-zero when the
+  mailbox doesn't match.
+- `higgs extract --apply-as-label <Label> [--when <field>=<value>]`: stamp an
+  extraction outcome directly as a persistent, searchable label (e.g.
+  `--apply-as-label Needs-Reply --when needs_reply=true`) instead of
+  bookkeeping JSON output and applying labels in a separate pass.
+
 ## [1.0.7] - 2026-07-05
 
 ### Fixed

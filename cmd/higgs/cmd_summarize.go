@@ -52,7 +52,7 @@ for a whole thread (--thread UID).`,
 			})
 		},
 	}
-	cmd.Flags().StringVar(&uidsFlag, "uid", "", "Comma-separated UIDs to summarize")
+	cmd.Flags().StringVar(&uidsFlag, "uid", "", "Comma-separated UIDs to summarize ('-' reads UIDs/NDJSON from stdin)")
 	cmd.Flags().Uint32Var(&threadUID, "thread", 0, "Summarize the full thread containing this UID")
 	cmd.Flags().IntVar(&limit, "limit", 0, "Cap the number of UIDs processed (0 = no cap)")
 	cmd.Flags().StringVar(&userContext, "user-context", "", "Optional extra context added to the prompt")
@@ -117,7 +117,7 @@ func cmdSummarize(mailbox string, a summarizeArgs) error {
 			targetUIDs = []uint32{a.threadUID}
 		}
 	} else {
-		targetUIDs, err = parseUIDList(a.uids)
+		targetUIDs, err = resolveUIDList(a.uids)
 		if err != nil {
 			return cerr.Validation("%s", err.Error())
 		}

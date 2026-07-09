@@ -26,7 +26,7 @@ type writeTarget struct {
 }
 
 func addTargetFlags(cmd *cobra.Command, t *writeTarget) {
-	cmd.Flags().StringVar(&t.explicitUIDs, "uid", "", "Comma-separated UIDs to target")
+	cmd.Flags().StringVar(&t.explicitUIDs, "uid", "", "Comma-separated UIDs to target ('-' reads UIDs/NDJSON from stdin)")
 	cmd.Flags().BoolVar(&t.allMatching, "all-matching", false, "Target every message matching the search flags")
 	t.searchFlags = &searchFlags{}
 	addSearchFlags(cmd, t.searchFlags)
@@ -56,17 +56,23 @@ func parseUIDList(s string) ([]uint32, error) {
 // resolveTarget returns the concrete UID list. Exactly one of --uid or
 // --all-matching must be provided.
 func resolveTarget(c *client.Client, t *writeTarget, mailbox string) ([]uint32, error) {
-	explicit, err := parseUIDList(t.explicitUIDs)
-	if err != nil {
-		return nil, cerr.Validation("%s", err.Error())
-	}
-	if len(explicit) > 0 && t.allMatching {
+	// Key the exclusivity checks off the raw flag string so `--uid - --all-matching`
+	// errors before stdin is consumed.
+	hasExplicit := strings.TrimSpace(t.explicitUIDs) != ""
+	if hasExplicit && t.allMatching {
 		return nil, cerr.Validation("--uid and --all-matching are mutually exclusive")
 	}
-	if len(explicit) == 0 && !t.allMatching {
+	if !hasExplicit && !t.allMatching {
 		return nil, cerr.Validation("one of --uid or --all-matching is required")
 	}
-	if len(explicit) > 0 {
+	if hasExplicit {
+		explicit, err := resolveUIDList(t.explicitUIDs)
+		if err != nil {
+			return nil, cerr.Validation("%s", err.Error())
+		}
+		if len(explicit) == 0 {
+			return nil, cerr.Validation("one of --uid or --all-matching is required")
+		}
 		return explicit, nil
 	}
 	crit, err := buildCriteria(t.searchFlags)

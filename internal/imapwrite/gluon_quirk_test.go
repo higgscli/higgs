@@ -23,7 +23,7 @@ type gluonEmptySearchMailbox struct {
 
 func (m *gluonEmptySearchMailbox) SearchMessages(uid bool, criteria *imap.SearchCriteria) ([]uint32, error) {
 	if criteria != nil && criteria.Uid != nil {
-		status, err := m.Mailbox.Status([]imap.StatusItem{imap.StatusMessages})
+		status, err := m.Status([]imap.StatusItem{imap.StatusMessages})
 		if err != nil {
 			return nil, err
 		}

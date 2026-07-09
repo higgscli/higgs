@@ -55,6 +55,7 @@ JSON on stdout; progress and diagnostics go to stderr.`,
 		newThreadsCmd(),
 		newTrashCmd(),
 		newUnsubscribeCmd(),
+		newVerifyCmd(),
 		newWatchCmd(),
 	)
 	return root

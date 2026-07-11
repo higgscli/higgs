@@ -6,7 +6,7 @@ An agent-first CLI for Proton Mail. Schema manifest for tool use, NDJSON on stdo
 [![Release](https://img.shields.io/github/v/release/higgscli/higgs?label=release&logo=github)](https://github.com/higgscli/higgs/releases/latest)
 [![Go Reference](https://pkg.go.dev/badge/github.com/higgscli/higgs.svg)](https://pkg.go.dev/github.com/higgscli/higgs)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Go](https://img.shields.io/badge/Go-1.25-blue?logo=go)](https://go.dev/)
+[![Go](https://img.shields.io/github/go-mod/go-version/higgscli/higgs?logo=go)](https://go.dev/)
 
 > **Unofficial project.** `higgs` is an independent, community-built CLI for Proton Mail. It is not affiliated with, endorsed by, or sponsored by Proton AG. "Proton", "Proton Mail", and related marks are trademarks of Proton AG; this project uses them only to describe interoperability.
 

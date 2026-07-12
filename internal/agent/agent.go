@@ -135,7 +135,7 @@ func Run(ctx context.Context, question string, opts Options, w io.Writer) (Answe
 		return Answer{}, errors.New("BinPath required")
 	}
 	if opts.Client == nil && opts.ChatFn == nil {
-		return Answer{}, errors.New("Client required")
+		return Answer{}, errors.New("llm client required")
 	}
 	maxSteps := opts.MaxSteps
 	if maxSteps <= 0 {

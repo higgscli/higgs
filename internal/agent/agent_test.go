@@ -15,7 +15,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/higgscli/higgs/internal/ollama"
+	"github.com/higgscli/higgs/internal/llmclient"
 )
 
 // scriptedLLM is a fake ChatFunc that returns canned responses in order.
@@ -25,7 +25,7 @@ type scriptedLLM struct {
 	calls     int32
 }
 
-func (s *scriptedLLM) fn(ctx context.Context, baseURL, model string, messages []ollama.ChatMessage, schema interface{}, out interface{}) error {
+func (s *scriptedLLM) fn(ctx context.Context, req llmclient.ChatRequest, out interface{}) error {
 	idx := int(atomic.AddInt32(&s.calls, 1)) - 1
 	if idx >= len(s.responses) {
 		return errors.New("scriptedLLM: out of responses")
@@ -36,6 +36,20 @@ func (s *scriptedLLM) fn(ctx context.Context, baseURL, model string, messages []
 	}
 	body, _ := json.Marshal(resp)
 	return json.Unmarshal(body, out)
+}
+
+// tcAgent builds an Ollama-backend llmclient pointed at a test server.
+func tcAgent(t *testing.T, baseURL string) llmclient.Client {
+	t.Helper()
+	c, err := llmclient.New(llmclient.Config{
+		Backend:       llmclient.BackendOllama,
+		OllamaBaseURL: baseURL,
+		OllamaModel:   "m",
+	})
+	if err != nil {
+		t.Fatalf("llmclient.New: %v", err)
+	}
+	return c
 }
 
 // writeAgentFakeBin reuses the writeFakeBin helper but returns a script
@@ -101,7 +115,6 @@ func TestRun_HappyPath(t *testing.T) {
 	var buf bytes.Buffer
 	ans, err := Run(context.Background(), "did alice email me?", Options{
 		BinPath:      bin,
-		BaseURL:      "http://unused",
 		Model:        "m",
 		MaxSteps:     3,
 		AllowedTools: []string{"search", "summarize"},
@@ -140,7 +153,6 @@ func TestRun_TraceEvents(t *testing.T) {
 	var buf bytes.Buffer
 	_, err := Run(context.Background(), "q", Options{
 		BinPath:      bin,
-		BaseURL:      "http://unused",
 		Model:        "m",
 		AllowedTools: []string{"search", "summarize"},
 		Trace:        true,
@@ -187,7 +199,6 @@ func TestRun_MaxStepsRespected(t *testing.T) {
 	}
 	ans, err := Run(context.Background(), "q", Options{
 		BinPath:      bin,
-		BaseURL:      "http://x",
 		Model:        "m",
 		MaxSteps:     2,
 		AllowedTools: []string{"search"},
@@ -215,7 +226,6 @@ func TestRun_ToolNotInAllowList(t *testing.T) {
 	var buf bytes.Buffer
 	ans, err := Run(context.Background(), "q", Options{
 		BinPath:      bin,
-		BaseURL:      "http://x",
 		Model:        "m",
 		AllowedTools: []string{"search"},
 		Trace:        true,
@@ -243,7 +253,6 @@ func TestRun_PlanRetriesThenFails(t *testing.T) {
 	}
 	_, err := Run(context.Background(), "q", Options{
 		BinPath:      bin,
-		BaseURL:      "http://x",
 		Model:        "m",
 		AllowedTools: []string{"search"},
 		ChatFn:       llm.fn,
@@ -273,7 +282,6 @@ func TestRun_PlanRetrySucceeds(t *testing.T) {
 	}
 	ans, err := Run(context.Background(), "q", Options{
 		BinPath:      bin,
-		BaseURL:      "http://x",
 		Model:        "m",
 		AllowedTools: []string{"search"},
 		ChatFn:       llm.fn,
@@ -301,7 +309,6 @@ func TestRun_StepNonZeroExitContinues(t *testing.T) {
 	var buf bytes.Buffer
 	ans, err := Run(context.Background(), "q", Options{
 		BinPath:      bin,
-		BaseURL:      "http://x",
 		Model:        "m",
 		AllowedTools: []string{"fail", "search"},
 		Trace:        true,
@@ -331,7 +338,6 @@ func TestRun_AnswerSynthesisError(t *testing.T) {
 	}
 	_, err := Run(context.Background(), "q", Options{
 		BinPath:      bin,
-		BaseURL:      "http://x",
 		Model:        "m",
 		AllowedTools: []string{"search"},
 		ChatFn:       llm.fn,
@@ -345,21 +351,18 @@ func TestRun_AnswerSynthesisError(t *testing.T) {
 }
 
 func TestRun_Validation(t *testing.T) {
-	_, err := Run(context.Background(), "", Options{BinPath: "x", BaseURL: "u", Model: "m"}, io.Discard)
+	llm := &scriptedLLM{}
+	_, err := Run(context.Background(), "", Options{BinPath: "x", Model: "m", ChatFn: llm.fn}, io.Discard)
 	if err == nil {
 		t.Error("empty question should error")
 	}
-	_, err = Run(context.Background(), "q", Options{BaseURL: "u", Model: "m"}, io.Discard)
+	_, err = Run(context.Background(), "q", Options{Model: "m", ChatFn: llm.fn}, io.Discard)
 	if err == nil {
 		t.Error("empty BinPath should error")
 	}
 	_, err = Run(context.Background(), "q", Options{BinPath: "x", Model: "m"}, io.Discard)
 	if err == nil {
-		t.Error("empty BaseURL should error")
-	}
-	_, err = Run(context.Background(), "q", Options{BinPath: "x", BaseURL: "u"}, io.Discard)
-	if err == nil {
-		t.Error("empty Model should error")
+		t.Error("missing Client and ChatFn should error")
 	}
 }
 
@@ -367,7 +370,6 @@ func TestRun_DiscoverFails(t *testing.T) {
 	llm := &scriptedLLM{}
 	_, err := Run(context.Background(), "q", Options{
 		BinPath: "/definitely/not/a/bin",
-		BaseURL: "http://x",
 		Model:   "m",
 		ChatFn:  llm.fn,
 	}, io.Discard)
@@ -393,8 +395,9 @@ func TestTruncate(t *testing.T) {
 }
 
 func TestChatFnDefault_UsedWhenNil(t *testing.T) {
-	// When ChatFn is nil, ollama.ChatWithSchema is used. We wire a real
-	// http server so the fallback path is exercised.
+	// When ChatFn is nil, requests go through Options.Client. We wire a real
+	// http server behind an Ollama-backend client so the fallback path is
+	// exercised.
 	dir := t.TempDir()
 	bin := writeAgentFakeBin(t, dir)
 	respNum := int32(0)
@@ -414,7 +417,7 @@ func TestChatFnDefault_UsedWhenNil(t *testing.T) {
 	defer srv.Close()
 	ans, err := Run(context.Background(), "q", Options{
 		BinPath:      bin,
-		BaseURL:      srv.URL,
+		Client:       tcAgent(t, srv.URL),
 		Model:        "m",
 		AllowedTools: []string{"search"},
 	}, io.Discard)

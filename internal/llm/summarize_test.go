@@ -33,7 +33,7 @@ func TestSummarize_Success(t *testing.T) {
 	payload := `{"tldr":"Hello","bullets":["one","two"],"is_action_required":true,"due_date":"2026-05-01T00:00:00Z"}`
 	srv, cap := newChatServer(t, payload)
 	m := Message{UID: 1, From: "a@b.com", Subject: "Hi", Date: "2026-04-10T00:00:00Z", Body: strings.Repeat("x", 20000)}
-	got, err := Summarize(context.Background(), srv.URL, "m", m, SummarizeOpts{MaxBulletCount: 3, UserContext: "be terse", MaxInput: 100})
+	got, err := Summarize(context.Background(), tc(t, srv.URL), "m", m, SummarizeOpts{MaxBulletCount: 3, UserContext: "be terse", MaxInput: 100})
 	if err != nil {
 		t.Fatalf("Summarize: %v", err)
 	}
@@ -53,7 +53,7 @@ func TestSummarize_DefaultOpts(t *testing.T) {
 	payload := `{"tldr":"x","bullets":[],"is_action_required":false}`
 	srv, _ := newChatServer(t, payload)
 	m := Message{UID: 1, Body: "body"}
-	got, err := Summarize(context.Background(), srv.URL, "m", m, SummarizeOpts{})
+	got, err := Summarize(context.Background(), tc(t, srv.URL), "m", m, SummarizeOpts{})
 	if err != nil {
 		t.Fatalf("Summarize: %v", err)
 	}
@@ -67,7 +67,7 @@ func TestSummarize_4xx(t *testing.T) {
 		w.WriteHeader(http.StatusBadRequest)
 	}))
 	defer srv.Close()
-	_, err := Summarize(context.Background(), srv.URL, "m", Message{}, SummarizeOpts{})
+	_, err := Summarize(context.Background(), tc(t, srv.URL), "m", Message{}, SummarizeOpts{})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -81,7 +81,7 @@ func TestSummarize_5xx(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer srv.Close()
-	_, err := Summarize(context.Background(), srv.URL, "m", Message{}, SummarizeOpts{})
+	_, err := Summarize(context.Background(), tc(t, srv.URL), "m", Message{}, SummarizeOpts{})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -92,7 +92,7 @@ func TestSummarize_MalformedOuter(t *testing.T) {
 		_, _ = io.WriteString(w, "not json")
 	}))
 	defer srv.Close()
-	_, err := Summarize(context.Background(), srv.URL, "m", Message{}, SummarizeOpts{})
+	_, err := Summarize(context.Background(), tc(t, srv.URL), "m", Message{}, SummarizeOpts{})
 	if err == nil {
 		t.Fatal("expected decode error")
 	}
@@ -100,7 +100,7 @@ func TestSummarize_MalformedOuter(t *testing.T) {
 
 func TestSummarize_NonJSONContent(t *testing.T) {
 	srv, _ := newChatServer(t, "not-json-inside")
-	_, err := Summarize(context.Background(), srv.URL, "m", Message{}, SummarizeOpts{})
+	_, err := Summarize(context.Background(), tc(t, srv.URL), "m", Message{}, SummarizeOpts{})
 	if err == nil {
 		t.Fatal("expected parse error")
 	}
@@ -108,7 +108,7 @@ func TestSummarize_NonJSONContent(t *testing.T) {
 
 func TestSummarize_EmptyContent(t *testing.T) {
 	srv, _ := newChatServer(t, "")
-	_, err := Summarize(context.Background(), srv.URL, "m", Message{}, SummarizeOpts{})
+	_, err := Summarize(context.Background(), tc(t, srv.URL), "m", Message{}, SummarizeOpts{})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -125,7 +125,7 @@ func TestSummarize_ContextCancel(t *testing.T) {
 	defer srv.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
 	defer cancel()
-	_, err := Summarize(ctx, srv.URL, "m", Message{}, SummarizeOpts{})
+	_, err := Summarize(ctx, tc(t, srv.URL), "m", Message{}, SummarizeOpts{})
 	if err == nil {
 		t.Fatal("expected cancel error")
 	}
@@ -138,7 +138,7 @@ func TestSummarizeThread_OrdersByDate(t *testing.T) {
 		{UID: 2, Subject: "second", Date: "2026-04-10T00:00:00Z", Body: "later"},
 		{UID: 1, Subject: "first", Date: "2026-04-01T00:00:00Z", Body: "earlier"},
 	}
-	got, err := SummarizeThread(context.Background(), srv.URL, "m", msgs, SummarizeOpts{UserContext: "ctx"})
+	got, err := SummarizeThread(context.Background(), tc(t, srv.URL), "m", msgs, SummarizeOpts{UserContext: "ctx"})
 	if err != nil {
 		t.Fatalf("SummarizeThread: %v", err)
 	}
@@ -158,7 +158,7 @@ func TestSummarizeThread_OrdersByDate(t *testing.T) {
 }
 
 func TestSummarizeThread_Empty(t *testing.T) {
-	got, err := SummarizeThread(context.Background(), "http://localhost", "m", nil, SummarizeOpts{})
+	got, err := SummarizeThread(context.Background(), tc(t, "http://localhost"), "m", nil, SummarizeOpts{})
 	if err != nil {
 		t.Fatalf("empty thread: %v", err)
 	}
@@ -172,7 +172,7 @@ func TestSummarizeThread_Error(t *testing.T) {
 		w.WriteHeader(http.StatusBadRequest)
 	}))
 	defer srv.Close()
-	_, err := SummarizeThread(context.Background(), srv.URL, "m", []Message{{UID: 1}}, SummarizeOpts{})
+	_, err := SummarizeThread(context.Background(), tc(t, srv.URL), "m", []Message{{UID: 1}}, SummarizeOpts{})
 	if err == nil {
 		t.Fatal("expected error")
 	}

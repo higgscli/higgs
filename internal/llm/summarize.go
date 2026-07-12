@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/higgscli/higgs/internal/cerr"
-	"github.com/higgscli/higgs/internal/ollama"
+	"github.com/higgscli/higgs/internal/llmclient"
 )
 
 // Summary is the structured output of the summarize verb.
@@ -78,7 +78,7 @@ var summarySchema = map[string]interface{}{
 }
 
 // Summarize produces a structured summary for a single message.
-func Summarize(ctx context.Context, baseURL, model string, m Message, opts SummarizeOpts) (Summary, error) {
+func Summarize(ctx context.Context, c llmclient.Client, model string, m Message, opts SummarizeOpts) (Summary, error) {
 	maxIn := opts.MaxInput
 	if maxIn <= 0 {
 		maxIn = defaultMaxInputBytes
@@ -89,12 +89,13 @@ func Summarize(ctx context.Context, baseURL, model string, m Message, opts Summa
 	}
 	userPrompt := buildUserPrompt(m, maxIn, opts.UserContext) +
 		"\n\nProduce at most " + itoa(bullets) + " bullets."
-	messages := []ollama.ChatMessage{
+	messages := []llmclient.ChatMessage{
 		{Role: "system", Content: summarizeSystemPrompt},
 		{Role: "user", Content: userPrompt},
 	}
 	var out Summary
-	if err := ollama.ChatWithSchema(ctx, baseURL, model, messages, summarySchema, &out); err != nil {
+	req := llmclient.ChatRequest{Model: model, Messages: messages, Schema: summarySchema, Thinking: true}
+	if err := llmclient.ChatJSON(ctx, c, req, &out); err != nil {
 		return Summary{}, cerr.Classify(err, "summarize")
 	}
 	out.DueDate = strings.TrimSpace(out.DueDate)
@@ -107,7 +108,7 @@ func Summarize(ctx context.Context, baseURL, model string, m Message, opts Summa
 // SummarizeThread produces a single Summary over a chronologically ordered
 // list of messages. Messages are sorted ascending by parsed Date (ties resolved
 // by input order) and concatenated with --- separators.
-func SummarizeThread(ctx context.Context, baseURL, model string, msgs []Message, opts SummarizeOpts) (Summary, error) {
+func SummarizeThread(ctx context.Context, c llmclient.Client, model string, msgs []Message, opts SummarizeOpts) (Summary, error) {
 	if len(msgs) == 0 {
 		return Summary{Bullets: []string{}}, nil
 	}
@@ -139,12 +140,13 @@ func SummarizeThread(ctx context.Context, baseURL, model string, msgs []Message,
 	}
 	userPrompt += "\n\nProduce at most " + itoa(bullets) + " bullets."
 
-	messages := []ollama.ChatMessage{
+	messages := []llmclient.ChatMessage{
 		{Role: "system", Content: summarizeThreadSystemPrompt},
 		{Role: "user", Content: userPrompt},
 	}
 	var out Summary
-	if err := ollama.ChatWithSchema(ctx, baseURL, model, messages, summarySchema, &out); err != nil {
+	req := llmclient.ChatRequest{Model: model, Messages: messages, Schema: summarySchema, Thinking: true}
+	if err := llmclient.ChatJSON(ctx, c, req, &out); err != nil {
 		return Summary{}, cerr.Classify(err, "summarize thread")
 	}
 	out.DueDate = strings.TrimSpace(out.DueDate)

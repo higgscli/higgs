@@ -176,7 +176,7 @@ func TestClassify_Success(t *testing.T) {
 	defer srv.Close()
 
 	msg := &email.Message{UID: 1, From: "amazon", Subject: "Order", BodySnippet: "tracking"}
-	got, err := Classify(context.Background(), srv.URL, "test-model", msg)
+	got, err := Classify(context.Background(), tc(t, srv.URL), "test-model", msg)
 	if err != nil {
 		t.Fatalf("Classify: %v", err)
 	}
@@ -196,7 +196,7 @@ func TestClassify_AddsNewsletterFallbackWhenMailingList(t *testing.T) {
 	srv := newFakeOllama(t, fakeOllamaOpts{content: string(content)})
 	defer srv.Close()
 
-	got, err := Classify(context.Background(), srv.URL, "m", &email.Message{})
+	got, err := Classify(context.Background(), tc(t, srv.URL), "m", &email.Message{})
 	if err != nil {
 		t.Fatalf("Classify: %v", err)
 	}
@@ -214,7 +214,7 @@ func TestClassify_MailingListWithPromotionsKept(t *testing.T) {
 	srv := newFakeOllama(t, fakeOllamaOpts{content: string(content)})
 	defer srv.Close()
 
-	got, err := Classify(context.Background(), srv.URL, "m", &email.Message{})
+	got, err := Classify(context.Background(), tc(t, srv.URL), "m", &email.Message{})
 	if err != nil {
 		t.Fatalf("Classify: %v", err)
 	}
@@ -234,7 +234,7 @@ func TestClassify_MailingListWithNewslettersKept(t *testing.T) {
 	srv := newFakeOllama(t, fakeOllamaOpts{content: string(content)})
 	defer srv.Close()
 
-	got, err := Classify(context.Background(), srv.URL, "m", &email.Message{})
+	got, err := Classify(context.Background(), tc(t, srv.URL), "m", &email.Message{})
 	if err != nil {
 		t.Fatalf("Classify: %v", err)
 	}
@@ -247,7 +247,7 @@ func TestClassify_HTTPError(t *testing.T) {
 	srv := newFakeOllama(t, fakeOllamaOpts{status: http.StatusInternalServerError})
 	defer srv.Close()
 
-	_, err := Classify(context.Background(), srv.URL, "m", &email.Message{})
+	_, err := Classify(context.Background(), tc(t, srv.URL), "m", &email.Message{})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -260,7 +260,7 @@ func TestClassify_MalformedJSON(t *testing.T) {
 	srv := newFakeOllama(t, fakeOllamaOpts{rawResponse: "not json at all"})
 	defer srv.Close()
 
-	_, err := Classify(context.Background(), srv.URL, "m", &email.Message{})
+	_, err := Classify(context.Background(), tc(t, srv.URL), "m", &email.Message{})
 	if err == nil {
 		t.Fatal("expected decode error")
 	}
@@ -271,7 +271,7 @@ func TestClassify_NonJSONContent(t *testing.T) {
 	srv := newFakeOllama(t, fakeOllamaOpts{content: "hello world"})
 	defer srv.Close()
 
-	_, err := Classify(context.Background(), srv.URL, "m", &email.Message{})
+	_, err := Classify(context.Background(), tc(t, srv.URL), "m", &email.Message{})
 	if err == nil {
 		t.Fatal("expected parse error")
 	}
@@ -285,7 +285,7 @@ func TestClassify_ContextCancel(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
 	defer cancel()
 
-	_, err := Classify(ctx, srv.URL, "m", &email.Message{})
+	_, err := Classify(ctx, tc(t, srv.URL), "m", &email.Message{})
 	if err == nil {
 		t.Fatal("expected context cancellation error")
 	}
@@ -306,7 +306,7 @@ func TestClassify_SendsExpectedRequestBody(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, err := Classify(context.Background(), srv.URL, "my-model", &email.Message{From: "a", Subject: "b", BodySnippet: "c"})
+	_, err := Classify(context.Background(), tc(t, srv.URL), "my-model", &email.Message{From: "a", Subject: "b", BodySnippet: "c"})
 	if err != nil {
 		t.Fatalf("Classify: %v", err)
 	}
@@ -332,7 +332,7 @@ func TestClassify_LogsTruncatedSubject(t *testing.T) {
 	defer srv.Close()
 
 	msg := &email.Message{Subject: strings.Repeat("x", 200)}
-	if _, err := Classify(context.Background(), srv.URL, "m", msg); err != nil {
+	if _, err := Classify(context.Background(), tc(t, srv.URL), "m", msg); err != nil {
 		t.Fatalf("Classify: %v", err)
 	}
 }

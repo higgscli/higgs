@@ -50,13 +50,13 @@ type schemaArg struct {
 }
 
 type schemaCommand struct {
-	Name      string       `json:"name"`
-	Short     string       `json:"short"`
-	Long      string       `json:"long,omitempty"`
-	Flags     []schemaFlag `json:"flags"`
-	Args      []schemaArg  `json:"args"`
-	Stdout    string       `json:"stdout,omitempty"`
-	ExitCodes []int        `json:"exit_codes"`
+	Name      string          `json:"name"`
+	Short     string          `json:"short"`
+	Long      string          `json:"long,omitempty"`
+	Flags     []schemaFlag    `json:"flags"`
+	Args      []schemaArg     `json:"args"`
+	Stdout    string          `json:"stdout,omitempty"`
+	ExitCodes []int           `json:"exit_codes"`
 	Commands  []schemaCommand `json:"commands,omitempty"`
 }
 

@@ -19,6 +19,7 @@ import (
 	"github.com/higgscli/higgs/internal/imapclient"
 	"github.com/higgscli/higgs/internal/imapfetch"
 	"github.com/higgscli/higgs/internal/imaputil"
+	"github.com/higgscli/higgs/internal/llmclient"
 	"github.com/higgscli/higgs/internal/parse"
 	"github.com/higgscli/higgs/internal/state"
 	"github.com/higgscli/higgs/internal/termio"
@@ -29,8 +30,10 @@ const BodySnippetCharsForClassify = 3000
 func newClassifyCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "classify [mailbox]",
-		Short: "Classify messages with Ollama and emit NDJSON results",
-		Long: `Fetch messages in batches, classify each with Ollama (suggested labels +
+		Short: "Classify messages with a local LLM and emit NDJSON results",
+		Long: `Fetch messages in batches, classify each with the configured local LLM
+backend — Ollama by default, or an OpenAI-compatible server such as llama.cpp
+via PM_LLM_BACKEND=openai — (suggested labels +
 mailing-list detection), emit one NDJSON line per message to stdout. Uses
 SQLite to track processed messages for idempotency.`,
 		Args: cobra.MaximumNArgs(1),
@@ -82,6 +85,10 @@ func cmdClassify(mailbox string, dryRun, apply bool, limitFlag int, noState, rep
 
 	termio.Info("Loading config from environment")
 	cfg, err := config.LoadFromEnv()
+	if err != nil {
+		return cerr.Config("%s", err.Error())
+	}
+	llmc, err := llmclient.New(cfg.LLM)
 	if err != nil {
 		return cerr.Config("%s", err.Error())
 	}
@@ -247,7 +254,7 @@ func cmdClassify(mailbox string, dryRun, apply bool, limitFlag int, noState, rep
 		go func(workerID int) {
 			defer wg.Done()
 			for job := range jobs {
-				result, err := classify.Classify(ctx, cfg.Ollama.BaseURL, cfg.Ollama.Model, &job.msg)
+				result, err := classify.Classify(ctx, llmc, "", &job.msg)
 				results <- classifyResult{
 					msg:    job.msg,
 					result: result,

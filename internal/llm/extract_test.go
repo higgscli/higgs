@@ -38,7 +38,7 @@ func TestExtract_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("preset: %v", err)
 	}
-	got, err := Extract(context.Background(), srv.URL, "m", Message{UID: 1, Body: "invoice text"}, schema)
+	got, err := Extract(context.Background(), tc(t, srv.URL), "m", Message{UID: 1, Body: "invoice text"}, schema)
 	if err != nil {
 		t.Fatalf("Extract: %v", err)
 	}
@@ -52,7 +52,7 @@ func TestExtract_Error(t *testing.T) {
 		w.WriteHeader(http.StatusBadRequest)
 	}))
 	defer srv.Close()
-	_, err := Extract(context.Background(), srv.URL, "m", Message{}, map[string]any{"type": "object"})
+	_, err := Extract(context.Background(), tc(t, srv.URL), "m", Message{}, map[string]any{"type": "object"})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -66,7 +66,7 @@ func TestExtract_5xx(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer srv.Close()
-	_, err := Extract(context.Background(), srv.URL, "m", Message{}, map[string]any{})
+	_, err := Extract(context.Background(), tc(t, srv.URL), "m", Message{}, map[string]any{})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -77,7 +77,7 @@ func TestExtract_MalformedOuter(t *testing.T) {
 		_, _ = w.Write([]byte("not json"))
 	}))
 	defer srv.Close()
-	_, err := Extract(context.Background(), srv.URL, "m", Message{}, map[string]any{})
+	_, err := Extract(context.Background(), tc(t, srv.URL), "m", Message{}, map[string]any{})
 	if err == nil {
 		t.Fatal("expected decode error")
 	}
@@ -85,7 +85,7 @@ func TestExtract_MalformedOuter(t *testing.T) {
 
 func TestExtract_NonJSONContent(t *testing.T) {
 	srv, _ := newChatServer(t, "not-json")
-	_, err := Extract(context.Background(), srv.URL, "m", Message{}, map[string]any{})
+	_, err := Extract(context.Background(), tc(t, srv.URL), "m", Message{}, map[string]any{})
 	if err == nil {
 		t.Fatal("expected parse error")
 	}
@@ -93,7 +93,7 @@ func TestExtract_NonJSONContent(t *testing.T) {
 
 func TestExtract_EmptyContent(t *testing.T) {
 	srv, _ := newChatServer(t, "")
-	_, err := Extract(context.Background(), srv.URL, "m", Message{}, map[string]any{})
+	_, err := Extract(context.Background(), tc(t, srv.URL), "m", Message{}, map[string]any{})
 	if err == nil {
 		t.Fatal("expected empty error")
 	}
@@ -106,7 +106,7 @@ func TestExtract_ContextCancel(t *testing.T) {
 	defer srv.Close()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err := Extract(ctx, srv.URL, "m", Message{}, map[string]any{})
+	_, err := Extract(ctx, tc(t, srv.URL), "m", Message{}, map[string]any{})
 	if err == nil {
 		t.Fatal("expected cancel error")
 	}
@@ -115,7 +115,7 @@ func TestExtract_ContextCancel(t *testing.T) {
 func TestExtract_NullResult(t *testing.T) {
 	// Content is literal JSON null — decode succeeds, output should be empty map.
 	srv, _ := newChatServer(t, "null")
-	got, err := Extract(context.Background(), srv.URL, "m", Message{}, map[string]any{})
+	got, err := Extract(context.Background(), tc(t, srv.URL), "m", Message{}, map[string]any{})
 	if err != nil {
 		t.Fatalf("Extract: %v", err)
 	}

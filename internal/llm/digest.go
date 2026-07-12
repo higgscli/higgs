@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/higgscli/higgs/internal/cerr"
-	"github.com/higgscli/higgs/internal/ollama"
+	"github.com/higgscli/higgs/internal/llmclient"
 )
 
 // Highlight is one notable message surfaced by the digest.
@@ -86,7 +86,7 @@ var digestSchema = map[string]interface{}{
 // BuildDigest asks the model to synthesize a digest over all provided
 // messages in a single call. Callers should cap the input count before
 // invoking.
-func BuildDigest(ctx context.Context, baseURL, model string, msgs []Message, opts DigestOpts) (Digest, error) {
+func BuildDigest(ctx context.Context, c llmclient.Client, model string, msgs []Message, opts DigestOpts) (Digest, error) {
 	system := digestSystemPromptBase
 	if len(opts.CanonicalLabels) > 0 {
 		system += "\n\nBucket messages using ONLY these canonical labels: " +
@@ -110,12 +110,13 @@ func BuildDigest(ctx context.Context, baseURL, model string, msgs []Message, opt
 		b.WriteString(opts.UserContext)
 	}
 
-	messages := []ollama.ChatMessage{
+	messages := []llmclient.ChatMessage{
 		{Role: "system", Content: system},
 		{Role: "user", Content: b.String()},
 	}
 	var out Digest
-	if err := ollama.ChatWithSchema(ctx, baseURL, model, messages, digestSchema, &out); err != nil {
+	req := llmclient.ChatRequest{Model: model, Messages: messages, Schema: digestSchema}
+	if err := llmclient.ChatJSON(ctx, c, req, &out); err != nil {
 		return Digest{}, cerr.Classify(err, "digest")
 	}
 	if out.Highlights == nil {

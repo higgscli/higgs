@@ -8,7 +8,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/higgscli/higgs/internal/ollama"
+	"github.com/higgscli/higgs/internal/llmclient"
 )
 
 // Options configures a Run invocation.
@@ -16,9 +16,10 @@ type Options struct {
 	// BinPath is the path to the higgs binary used for subprocess tool
 	// calls. Tests may substitute a small shell script.
 	BinPath string
-	// BaseURL is the Ollama API endpoint.
-	BaseURL string
-	// Model is the Ollama model name.
+	// Client is the LLM backend used for planning and synthesis. Required
+	// unless ChatFn is set.
+	Client llmclient.Client
+	// Model overrides the client's default model when non-empty.
 	Model string
 	// MaxSteps caps how many tool invocations the loop will execute. If
 	// <= 0, defaults to 5.
@@ -35,13 +36,13 @@ type Options struct {
 	// PlanBudget caps total wall time for planning + execution. If <= 0,
 	// defaults to 2 minutes.
 	PlanBudget time.Duration
-	// ChatFn allows tests to substitute the LLM call. When nil, the
-	// package default (ollama.ChatWithSchema) is used.
+	// ChatFn allows tests to substitute the LLM call. When nil, requests go
+	// through Client via llmclient.ChatJSON.
 	ChatFn ChatFunc
 }
 
-// ChatFunc mirrors the ollama.ChatWithSchema signature for injection.
-type ChatFunc func(ctx context.Context, baseURL, model string, messages []ollama.ChatMessage, schema interface{}, out interface{}) error
+// ChatFunc mirrors llmclient.ChatJSON for injection.
+type ChatFunc func(ctx context.Context, req llmclient.ChatRequest, out any) error
 
 // Step is one planned tool invocation.
 type Step struct {
@@ -133,11 +134,8 @@ func Run(ctx context.Context, question string, opts Options, w io.Writer) (Answe
 	if opts.BinPath == "" {
 		return Answer{}, errors.New("BinPath required")
 	}
-	if opts.BaseURL == "" {
-		return Answer{}, errors.New("BaseURL required")
-	}
-	if opts.Model == "" {
-		return Answer{}, errors.New("model required")
+	if opts.Client == nil && opts.ChatFn == nil {
+		return Answer{}, errors.New("Client required")
 	}
 	maxSteps := opts.MaxSteps
 	if maxSteps <= 0 {
@@ -153,7 +151,10 @@ func Run(ctx context.Context, question string, opts Options, w io.Writer) (Answe
 	}
 	chat := opts.ChatFn
 	if chat == nil {
-		chat = ollama.ChatWithSchema
+		client := opts.Client
+		chat = func(ctx context.Context, req llmclient.ChatRequest, out any) error {
+			return llmclient.ChatJSON(ctx, client, req, out)
+		}
 	}
 
 	budgetCtx, cancel := context.WithTimeout(ctx, budget)
@@ -251,22 +252,23 @@ func planStep(ctx context.Context, question string, tools []Tool, opts Options, 
 	if opts.UserContext != "" {
 		sys += "\nUser context: " + opts.UserContext
 	}
-	msgs := []ollama.ChatMessage{
+	msgs := []llmclient.ChatMessage{
 		{Role: "system", Content: sys},
 		{Role: "user", Content: question},
 	}
 
 	var plan Plan
-	err := chat(ctx, opts.BaseURL, opts.Model, msgs, planSchema, &plan)
+	req := llmclient.ChatRequest{Model: opts.Model, Messages: msgs, Schema: planSchema, Thinking: true}
+	err := chat(ctx, req, &plan)
 	if err == nil {
 		return plan, nil
 	}
 	// Retry once with a stricter reminder.
-	msgs = append(msgs, ollama.ChatMessage{
+	req.Messages = append(req.Messages, llmclient.ChatMessage{
 		Role:    "system",
 		Content: "Your previous response was not valid JSON per the schema. Return ONLY a JSON object matching {\"steps\":[{\"tool\":string,\"args\":[string],\"why\":string}]}.",
 	})
-	if err2 := chat(ctx, opts.BaseURL, opts.Model, msgs, planSchema, &plan); err2 != nil {
+	if err2 := chat(ctx, req, &plan); err2 != nil {
 		return Plan{}, fmt.Errorf("plan failed after retry: %w", err2)
 	}
 	return plan, nil
@@ -277,12 +279,12 @@ func planStep(ctx context.Context, question string, tools []Tool, opts Options, 
 // prompt size.
 func synthesize(ctx context.Context, question string, observations []stepObservation, opts Options, chat ChatFunc) (Answer, error) {
 	type obsPayload struct {
-		Tool     string `json:"tool"`
+		Tool     string   `json:"tool"`
 		Args     []string `json:"args"`
-		Status   string `json:"status"`
-		ExitCode int    `json:"exit_code"`
-		Stdout   string `json:"stdout"`
-		Stderr   string `json:"stderr,omitempty"`
+		Status   string   `json:"status"`
+		ExitCode int      `json:"exit_code"`
+		Stdout   string   `json:"stdout"`
+		Stderr   string   `json:"stderr,omitempty"`
 	}
 	payload := make([]obsPayload, 0, len(observations))
 	const maxBytes = 16 * 1024
@@ -303,12 +305,13 @@ func synthesize(ctx context.Context, question string, observations []stepObserva
 	sys := "You are an assistant that grounds answers in tool observations. " +
 		"Given the user's question and the NDJSON tool outputs below, produce a concise answer " +
 		"and citations (uid, subject, mailbox) drawn only from the observations. If the data is insufficient, say so."
-	msgs := []ollama.ChatMessage{
+	msgs := []llmclient.ChatMessage{
 		{Role: "system", Content: sys},
 		{Role: "user", Content: "Question: " + question + "\nObservations: " + string(obsJSON)},
 	}
 	var ans Answer
-	if err := chat(ctx, opts.BaseURL, opts.Model, msgs, answerSchema, &ans); err != nil {
+	req := llmclient.ChatRequest{Model: opts.Model, Messages: msgs, Schema: answerSchema, Thinking: true}
+	if err := chat(ctx, req, &ans); err != nil {
 		return Answer{}, fmt.Errorf("synthesize answer: %w", err)
 	}
 	if ans.Citations == nil {

@@ -17,7 +17,7 @@ func TestDigest_Success(t *testing.T) {
 		{UID: 1, Subject: "bill", From: "a@b.com", Date: "2026-04-01T00:00:00Z", Body: "pay this"},
 		{UID: 2, Subject: "promo", From: "c@d.com", Date: "2026-04-02T00:00:00Z", Body: "sale"},
 	}
-	got, err := BuildDigest(context.Background(), srv.URL, "m", msgs, DigestOpts{
+	got, err := BuildDigest(context.Background(), tc(t, srv.URL), "m", msgs, DigestOpts{
 		Window:          "7d",
 		CanonicalLabels: []string{"Finance", "Promotions"},
 		UserContext:     "focus on deadlines",
@@ -46,7 +46,7 @@ func TestDigest_Success(t *testing.T) {
 func TestDigest_Defaults(t *testing.T) {
 	payload := `{"window":"","highlights":[],"by_category":{},"counts":{}}`
 	srv, _ := newChatServer(t, payload)
-	got, err := BuildDigest(context.Background(), srv.URL, "m", []Message{{UID: 1, Body: "b"}}, DigestOpts{Window: "24h"})
+	got, err := BuildDigest(context.Background(), tc(t, srv.URL), "m", []Message{{UID: 1, Body: "b"}}, DigestOpts{Window: "24h"})
 	if err != nil {
 		t.Fatalf("Digest: %v", err)
 	}
@@ -63,7 +63,7 @@ func TestDigest_Error(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer srv.Close()
-	_, err := BuildDigest(context.Background(), srv.URL, "m", []Message{{UID: 1}}, DigestOpts{Window: "1d"})
+	_, err := BuildDigest(context.Background(), tc(t, srv.URL), "m", []Message{{UID: 1}}, DigestOpts{Window: "1d"})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -77,7 +77,7 @@ func TestDigest_MalformedOuter(t *testing.T) {
 		_, _ = w.Write([]byte("not json"))
 	}))
 	defer srv.Close()
-	_, err := BuildDigest(context.Background(), srv.URL, "m", nil, DigestOpts{Window: "1d"})
+	_, err := BuildDigest(context.Background(), tc(t, srv.URL), "m", nil, DigestOpts{Window: "1d"})
 	if err == nil {
 		t.Fatal("expected decode error")
 	}
@@ -85,7 +85,7 @@ func TestDigest_MalformedOuter(t *testing.T) {
 
 func TestDigest_NonJSONContent(t *testing.T) {
 	srv, _ := newChatServer(t, "plain text")
-	_, err := BuildDigest(context.Background(), srv.URL, "m", nil, DigestOpts{Window: "1d"})
+	_, err := BuildDigest(context.Background(), tc(t, srv.URL), "m", nil, DigestOpts{Window: "1d"})
 	if err == nil {
 		t.Fatal("expected parse error")
 	}
@@ -93,7 +93,7 @@ func TestDigest_NonJSONContent(t *testing.T) {
 
 func TestDigest_EmptyContent(t *testing.T) {
 	srv, _ := newChatServer(t, "")
-	_, err := BuildDigest(context.Background(), srv.URL, "m", nil, DigestOpts{Window: "1d"})
+	_, err := BuildDigest(context.Background(), tc(t, srv.URL), "m", nil, DigestOpts{Window: "1d"})
 	if err == nil {
 		t.Fatal("expected empty error")
 	}
@@ -106,7 +106,7 @@ func TestDigest_ContextCancel(t *testing.T) {
 	defer srv.Close()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err := BuildDigest(ctx, srv.URL, "m", nil, DigestOpts{Window: "1d"})
+	_, err := BuildDigest(ctx, tc(t, srv.URL), "m", nil, DigestOpts{Window: "1d"})
 	if err == nil {
 		t.Fatal("expected cancel error")
 	}

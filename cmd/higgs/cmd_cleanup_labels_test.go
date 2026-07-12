@@ -68,16 +68,16 @@ func TestCleanupLabelsTaxonomyWired(t *testing.T) {
 
 	// Spot-check a few aliases that used to live in the local map.
 	cases := map[string]string{
-		"shipping":  "Orders",
-		"invoice":   "Finance",
-		"promo":     "Promotions",
-		"linkedin":  "Jobs",
-		"nextdoor":  "Social",
-		"outage":    "Services",
-		"wellness":  "Health",
-		"flight":    "Travel",
-		"2fa":       "Security",
-		"domain":    "Signups",
+		"shipping": "Orders",
+		"invoice":  "Finance",
+		"promo":    "Promotions",
+		"linkedin": "Jobs",
+		"nextdoor": "Social",
+		"outage":   "Services",
+		"wellness": "Health",
+		"flight":   "Travel",
+		"2fa":      "Security",
+		"domain":   "Signups",
 	}
 	for alias, wantName := range cases {
 		got, ok := labels.Default.CanonicalFor(alias)

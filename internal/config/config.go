@@ -12,6 +12,7 @@ import (
 
 	"github.com/higgscli/higgs/internal/cerr"
 	"github.com/higgscli/higgs/internal/keystore"
+	"github.com/higgscli/higgs/internal/llmclient"
 	"github.com/higgscli/higgs/internal/termio"
 )
 
@@ -40,6 +41,9 @@ type OllamaConfig struct {
 type Config struct {
 	IMAP   IMAPConfig
 	Ollama OllamaConfig
+	// LLM selects and configures the chat backend (PM_LLM_BACKEND: ollama or
+	// openai). Ollama above is kept in sync for backward compatibility.
+	LLM llmclient.Config
 }
 
 // LoadFromEnv loads config from environment. Default host/port match Proton Mail Bridge
@@ -81,8 +85,15 @@ func LoadFromEnv() (Config, error) {
 
 	termio.Info("IMAP config: host=%s port=%d security=%s tls_skip_verify=%v username=%s", host, port, security, tlsSkipVerify, username)
 
-	ollamaBaseURL := getEnvDefault("PM_OLLAMA_BASE_URL", "http://localhost:11434")
-	ollamaModel := getEnvDefault("PM_OLLAMA_MODEL", "gemma4")
+	llmCfg, err := llmclient.LoadFromEnv()
+	if err != nil {
+		return Config{}, cerr.Config("%s", err.Error())
+	}
+	if llmCfg.Backend == llmclient.BackendOpenAI {
+		termio.Info("LLM backend: openai base_url=%s model=%s", llmCfg.OpenAIBaseURL, llmCfg.OpenAIModel)
+	} else {
+		termio.Info("LLM backend: ollama base_url=%s model=%s", llmCfg.OllamaBaseURL, llmCfg.OllamaModel)
+	}
 
 	return Config{
 		IMAP: IMAPConfig{
@@ -94,9 +105,10 @@ func LoadFromEnv() (Config, error) {
 			TLSSkipVerify: tlsSkipVerify,
 		},
 		Ollama: OllamaConfig{
-			BaseURL: ollamaBaseURL,
-			Model:   ollamaModel,
+			BaseURL: llmCfg.OllamaBaseURL,
+			Model:   llmCfg.OllamaModel,
 		},
+		LLM: llmCfg,
 	}, nil
 }
 

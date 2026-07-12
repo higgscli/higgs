@@ -26,7 +26,7 @@ The first workload riding this contract is a local-only Proton Mail inbox classi
  
 ## The classifier
  
-`higgs classify` connects to a running [Proton Mail Bridge](https://proton.me/mail/bridge) over IMAP, streams each message through a local [Ollama](https://ollama.com/) model, and applies one or more labels from an 11-category taxonomy. Every step runs on `localhost`: no API keys, no cloud inference, no telemetry.
+`higgs classify` connects to a running [Proton Mail Bridge](https://proton.me/mail/bridge) over IMAP, streams each message through a local LLM ([Ollama](https://ollama.com/) by default, or any self-hosted OpenAI-compatible server such as llama.cpp `llama-server` — see `PM_LLM_BACKEND`), and applies one or more labels from an 11-category taxonomy. Every step runs on `localhost`: no API keys, no cloud inference, no telemetry.
  
 The default model is [Gemma 4](https://ollama.com/library/gemma4), chosen because it has native function-calling support, a 128K context window on the small variants, and fits comfortably on a laptop.
  
@@ -283,12 +283,42 @@ If `PM_IMAP_USERNAME` and/or `PM_IMAP_PASSWORD` are set in the environment they 
 | `PM_IMAP_TLS_SKIP_VERIFY` | auto | Skip TLS verification (auto-enabled for loopback) |
 | `PM_IMAP_APPLY_TIMEOUT` | `180` | Per-command timeout (seconds) for `--apply` |
  
-### Ollama
+### LLM backend
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `PM_LLM_BACKEND` | `ollama` | Chat backend: `ollama` or `openai` |
+
+Everything stays local either way: `openai` means the OpenAI-compatible Chat
+Completions API served by self-hosted engines like llama.cpp `llama-server` —
+not the OpenAI cloud.
+
+#### Ollama (`PM_LLM_BACKEND=ollama`, default)
  
 | Variable | Default | Description |
 | --- | --- | --- |
 | `PM_OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama API base URL |
 | `PM_OLLAMA_MODEL` | `gemma4` | Model name passed to Ollama |
+
+#### OpenAI-compatible (`PM_LLM_BACKEND=openai`)
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `PM_OPENAI_BASE_URL` | *(required)* | Server base URL, e.g. `http://localhost:8080` (llama.cpp `llama-server`) |
+| `PM_OPENAI_MODEL` | *(required)* | Model name/alias the server expects |
+| `PM_OPENAI_API_KEY` | *(none)* | Optional bearer token; sent only when set |
+
+Reasoning models (e.g. Qwen3) are handled automatically: thinking is disabled
+for structured calls (`classify`, `extract`, `digest`), enabled for `ask` and
+`summarize`, and any `<think>` preamble is stripped before parsing. Structured
+output uses `response_format: json_schema`. Example:
+
+```
+PM_LLM_BACKEND=openai \
+PM_OPENAI_BASE_URL=http://localhost:8080 \
+PM_OPENAI_MODEL=qwen3.6-35b-a3b \
+higgs classify INBOX --limit 20 --dry-run
+```
  
 ### Classify tuning
  
@@ -296,7 +326,7 @@ If `PM_IMAP_USERNAME` and/or `PM_IMAP_PASSWORD` are set in the environment they 
 | --- | --- | --- |
 | `PM_CLASSIFY_LIMIT` | `100` | Max messages per `classify` run |
 | `PM_CLASSIFY_BATCH_SIZE` | `25` | IMAP fetch batch size |
-| `PM_CLASSIFY_WORKERS` | `4` | Parallel Ollama workers |
+| `PM_CLASSIFY_WORKERS` | `4` | Parallel LLM requests (llama-server serializes unless started with `--parallel N`) |
  
 ### State
  

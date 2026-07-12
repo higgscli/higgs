@@ -1,5 +1,5 @@
-// Package classify runs messages through a local Ollama model and maps the
-// model output onto the canonical higgs label taxonomy.
+// Package classify runs messages through the configured local LLM backend and
+// maps the model output onto the canonical higgs label taxonomy.
 package classify
 
 import (
@@ -8,7 +8,7 @@ import (
 
 	"github.com/higgscli/higgs/internal/email"
 	"github.com/higgscli/higgs/internal/labels"
-	"github.com/higgscli/higgs/internal/ollama"
+	"github.com/higgscli/higgs/internal/llmclient"
 	"github.com/higgscli/higgs/internal/termio"
 )
 
@@ -72,19 +72,21 @@ Rules:
 3. is_mailing_list = true if the email contains "unsubscribe", "manage preferences", or mailing-list language.
 4. Output a single JSON object. No Markdown. No code fences. No prose.`
 
-// Classify runs Ollama with the email snippet and returns the structured result.
-func Classify(ctx context.Context, baseURL, model string, msg *email.Message) (*Result, error) {
+// Classify runs the configured LLM backend with the email snippet and returns
+// the structured result.
+func Classify(ctx context.Context, c llmclient.Client, model string, msg *email.Message) (*Result, error) {
 	userContent := fmt.Sprintf("Classify this email.\n\nFrom: %s\nSubject: %s\n\nBody snippet:\n%s",
 		msg.From, msg.Subject, msg.BodySnippet)
 
-	messages := []ollama.ChatMessage{
+	messages := []llmclient.ChatMessage{
 		{Role: "system", Content: systemPrompt},
 		{Role: "user", Content: userContent},
 	}
 
 	var result Result
-	if err := ollama.ChatWithSchema(ctx, baseURL, model, messages, ClassificationSchema, &result); err != nil {
-		return nil, fmt.Errorf("ollama: %w", err)
+	req := llmclient.ChatRequest{Model: model, Messages: messages, Schema: ClassificationSchema}
+	if err := llmclient.ChatJSON(ctx, c, req, &result); err != nil {
+		return nil, fmt.Errorf("llm: %w", err)
 	}
 
 	// Normalize labels to canonical set

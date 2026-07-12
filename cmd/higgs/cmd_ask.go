@@ -3,12 +3,12 @@ package main
 import (
 	"context"
 	"os"
-	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/higgscli/higgs/internal/agent"
 	"github.com/higgscli/higgs/internal/cerr"
+	"github.com/higgscli/higgs/internal/llmclient"
 	"github.com/higgscli/higgs/internal/termio"
 )
 
@@ -55,8 +55,8 @@ object.`,
 	cmd.Flags().IntVar(&maxSteps, "max-steps", 5, "Maximum tool invocations the agent may perform")
 	cmd.Flags().StringVar(&userContext, "user-context", "", "Optional extra context appended to the planner prompt")
 	cmd.Flags().BoolVar(&trace, "trace", false, "Emit NDJSON per-step events followed by a final answer event")
-	cmd.Flags().StringVar(&model, "model", "", "Override Ollama model (defaults to PM_OLLAMA_MODEL or gemma4)")
-	cmd.Flags().StringVar(&baseURL, "ollama-base-url", "", "Override Ollama base URL (defaults to PM_OLLAMA_BASE_URL or http://localhost:11434)")
+	cmd.Flags().StringVar(&model, "model", "", "Override the model for the active LLM backend (defaults to PM_OLLAMA_MODEL or PM_OPENAI_MODEL)")
+	cmd.Flags().StringVar(&baseURL, "ollama-base-url", "", "Override Ollama base URL when PM_LLM_BACKEND=ollama (defaults to PM_OLLAMA_BASE_URL or http://localhost:11434)")
 	return cmd
 }
 
@@ -73,19 +73,22 @@ func cmdAsk(question string, opts askOptions) error {
 	if err != nil {
 		return cerr.Internal(err, "resolve binary path")
 	}
-	model := opts.model
-	if model == "" {
-		model = askEnvDefault("PM_OLLAMA_MODEL", "gemma4")
+	llmCfg, err := llmclient.LoadFromEnv()
+	if err != nil {
+		return cerr.Config("%s", err.Error())
 	}
-	baseURL := opts.baseURL
-	if baseURL == "" {
-		baseURL = askEnvDefault("PM_OLLAMA_BASE_URL", "http://localhost:11434")
+	if opts.baseURL != "" {
+		llmCfg.OllamaBaseURL = opts.baseURL
+	}
+	client, err := llmclient.New(llmCfg)
+	if err != nil {
+		return cerr.Config("%s", err.Error())
 	}
 	w := termio.Default()
 	runOpts := agent.Options{
 		BinPath:     binPath,
-		BaseURL:     baseURL,
-		Model:       model,
+		Client:      client,
+		Model:       opts.model,
 		MaxSteps:    opts.maxSteps,
 		UserContext: opts.userContext,
 		Trace:       opts.trace,
@@ -106,12 +109,4 @@ func cmdAsk(question string, opts askOptions) error {
 		})
 	}
 	return w.PrintJSON(ans)
-}
-
-func askEnvDefault(key, def string) string {
-	v := strings.TrimSpace(os.Getenv(key))
-	if v == "" {
-		return def
-	}
-	return v
 }

@@ -18,6 +18,7 @@ func clearAllEnv(t *testing.T) {
 		"PM_IMAP_HOST", "PM_IMAP_PORT",
 		"PM_IMAP_SECURITY", "PM_IMAP_TLS", "PM_IMAP_TLS_SKIP_VERIFY",
 		"PM_OLLAMA_BASE_URL", "PM_OLLAMA_MODEL",
+		"PM_LLM_BACKEND", "PM_OPENAI_BASE_URL", "PM_OPENAI_API_KEY", "PM_OPENAI_MODEL",
 		"PM_KEYSTORE_PATH", "PM_KEYSTORE_PASSPHRASE",
 	} {
 		t.Setenv(key, "") // restored after test
@@ -36,6 +37,49 @@ func TestLoadFromEnv_MissingCredentials(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "no credentials") {
 		t.Fatalf("want 'no credentials' error, got %v", err)
+	}
+}
+
+func TestLoadFromEnv_LLMBackendDefault(t *testing.T) {
+	clearAllEnv(t)
+	t.Setenv("PM_IMAP_USERNAME", "u@x")
+	t.Setenv("PM_IMAP_PASSWORD", "pw")
+	cfg, err := LoadFromEnv()
+	if err != nil {
+		t.Fatalf("LoadFromEnv: %v", err)
+	}
+	if string(cfg.LLM.Backend) != "ollama" {
+		t.Errorf("backend=%q want ollama", cfg.LLM.Backend)
+	}
+	if cfg.LLM.OllamaBaseURL != cfg.Ollama.BaseURL || cfg.LLM.OllamaModel != cfg.Ollama.Model {
+		t.Errorf("LLM and Ollama sections out of sync: %+v vs %+v", cfg.LLM, cfg.Ollama)
+	}
+}
+
+func TestLoadFromEnv_LLMBackendOpenAI(t *testing.T) {
+	clearAllEnv(t)
+	t.Setenv("PM_IMAP_USERNAME", "u@x")
+	t.Setenv("PM_IMAP_PASSWORD", "pw")
+	t.Setenv("PM_LLM_BACKEND", "openai")
+	t.Setenv("PM_OPENAI_BASE_URL", "http://10.1.1.8:8080")
+	t.Setenv("PM_OPENAI_MODEL", "qwen3.6-35b-a3b")
+	cfg, err := LoadFromEnv()
+	if err != nil {
+		t.Fatalf("LoadFromEnv: %v", err)
+	}
+	if string(cfg.LLM.Backend) != "openai" || cfg.LLM.OpenAIModel != "qwen3.6-35b-a3b" {
+		t.Errorf("LLM cfg=%+v", cfg.LLM)
+	}
+}
+
+func TestLoadFromEnv_LLMBackendOpenAIMissingConfig(t *testing.T) {
+	clearAllEnv(t)
+	t.Setenv("PM_IMAP_USERNAME", "u@x")
+	t.Setenv("PM_IMAP_PASSWORD", "pw")
+	t.Setenv("PM_LLM_BACKEND", "openai")
+	_, err := LoadFromEnv()
+	if err == nil || !strings.Contains(err.Error(), "PM_OPENAI_BASE_URL") {
+		t.Fatalf("want PM_OPENAI_BASE_URL config error, got %v", err)
 	}
 }
 

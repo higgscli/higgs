@@ -17,6 +17,7 @@ import (
 	"github.com/higgscli/higgs/internal/imaputil"
 	"github.com/higgscli/higgs/internal/labels"
 	"github.com/higgscli/higgs/internal/llm"
+	"github.com/higgscli/higgs/internal/llmclient"
 	"github.com/higgscli/higgs/internal/termio"
 )
 
@@ -49,7 +50,7 @@ buckets, and counts.`,
 	cmd.Flags().StringVar(&since, "since", "7d", "Window duration (e.g. 7d, 24h, 90m)")
 	cmd.Flags().IntVar(&maxMessages, "max-messages", 100, "Cap on fetched messages before digesting")
 	cmd.Flags().StringVar(&userContext, "user-context", "", "Extra context appended to the digest prompt")
-	cmd.Flags().StringVar(&model, "model", "", "Override Ollama model (defaults to PM_OLLAMA_MODEL)")
+	cmd.Flags().StringVar(&model, "model", "", "Override the model for the active LLM backend (defaults to PM_OLLAMA_MODEL or PM_OPENAI_MODEL)")
 	return cmd
 }
 
@@ -83,8 +84,9 @@ func cmdDigest(mailbox, since string, maxMessages int, userContext, model string
 	if err != nil {
 		return err
 	}
-	if model == "" {
-		model = cfg.Ollama.Model
+	llmc, err := llmclient.New(cfg.LLM)
+	if err != nil {
+		return cerr.Config("%s", err.Error())
 	}
 
 	c, err := imapclient.Dial(cfg.IMAP)
@@ -134,7 +136,7 @@ func cmdDigest(mailbox, since string, maxMessages int, userContext, model string
 	}
 
 	ctx := context.Background()
-	out, err := llm.BuildDigest(ctx, cfg.Ollama.BaseURL, model, msgs, llm.DigestOpts{
+	out, err := llm.BuildDigest(ctx, llmc, model, msgs, llm.DigestOpts{
 		Window:          since,
 		UserContext:     userContext,
 		CanonicalLabels: labels.Default.Canonical(),

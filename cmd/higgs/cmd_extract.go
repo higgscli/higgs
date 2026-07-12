@@ -16,6 +16,7 @@ import (
 	"github.com/higgscli/higgs/internal/imapfetch"
 	"github.com/higgscli/higgs/internal/imaputil"
 	"github.com/higgscli/higgs/internal/llm"
+	"github.com/higgscli/higgs/internal/llmclient"
 	"github.com/higgscli/higgs/internal/termio"
 )
 
@@ -49,7 +50,7 @@ data has that field stringifying to that value.`,
 	cmd.Flags().StringVar(&schemaFile, "schema", "", "Path to a JSON schema file")
 	cmd.Flags().StringVar(&preset, "preset", "", "Preset schema: invoice|shipping|meeting")
 	cmd.Flags().StringVar(&uidsFlag, "uid", "", "Comma-separated UIDs to extract from ('-' reads UIDs/NDJSON from stdin)")
-	cmd.Flags().StringVar(&model, "model", "", "Override Ollama model (defaults to PM_OLLAMA_MODEL)")
+	cmd.Flags().StringVar(&model, "model", "", "Override the model for the active LLM backend (defaults to PM_OLLAMA_MODEL or PM_OPENAI_MODEL)")
 	cmd.Flags().StringVar(&applyAsLabel, "apply-as-label", "", "Apply this label (Labels/<name>) to each successfully extracted message")
 	cmd.Flags().StringVar(&when, "when", "", "Only label when the extracted field matches (field=value; requires --apply-as-label)")
 	return cmd
@@ -123,8 +124,9 @@ func cmdExtract(mailbox, schemaFile, preset, uidsFlag, model, applyAsLabel, when
 	if err != nil {
 		return err
 	}
-	if model == "" {
-		model = cfg.Ollama.Model
+	llmc, err := llmclient.New(cfg.LLM)
+	if err != nil {
+		return cerr.Config("%s", err.Error())
 	}
 
 	c, err := imapclient.Dial(cfg.IMAP)
@@ -167,7 +169,7 @@ func cmdExtract(mailbox, schemaFile, preset, uidsFlag, model, applyAsLabel, when
 	labelsApplied, labelApplyFailed := 0, 0
 	for _, f := range fetched {
 		m := fetchedToLLMMessage(f, resolved)
-		data, eErr := llm.Extract(ctx, cfg.Ollama.BaseURL, model, m, schema)
+		data, eErr := llm.Extract(ctx, llmc, model, m, schema)
 		if eErr != nil {
 			failed++
 			if perr := tio.PrintNDJSON(map[string]any{

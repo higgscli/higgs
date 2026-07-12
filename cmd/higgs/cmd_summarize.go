@@ -16,6 +16,7 @@ import (
 	"github.com/higgscli/higgs/internal/imapfetch"
 	"github.com/higgscli/higgs/internal/imaputil"
 	"github.com/higgscli/higgs/internal/llm"
+	"github.com/higgscli/higgs/internal/llmclient"
 	"github.com/higgscli/higgs/internal/parse"
 	"github.com/higgscli/higgs/internal/termio"
 )
@@ -33,7 +34,7 @@ func newSummarizeCmd() *cobra.Command {
 	)
 	cmd := &cobra.Command{
 		Use:   "summarize <mailbox>",
-		Short: "Summarize messages with Ollama and stream NDJSON results",
+		Short: "Summarize messages with a local LLM and stream NDJSON results",
 		Long: `Produce a structured summary for each UID (--uid) or one summary
 for a whole thread (--thread UID).`,
 		Args: cobra.ExactArgs(1),
@@ -56,7 +57,7 @@ for a whole thread (--thread UID).`,
 	cmd.Flags().Uint32Var(&threadUID, "thread", 0, "Summarize the full thread containing this UID")
 	cmd.Flags().IntVar(&limit, "limit", 0, "Cap the number of UIDs processed (0 = no cap)")
 	cmd.Flags().StringVar(&userContext, "user-context", "", "Optional extra context added to the prompt")
-	cmd.Flags().StringVar(&model, "model", "", "Override Ollama model (defaults to PM_OLLAMA_MODEL)")
+	cmd.Flags().StringVar(&model, "model", "", "Override the model for the active LLM backend (defaults to PM_OLLAMA_MODEL or PM_OPENAI_MODEL)")
 	cmd.Flags().IntVar(&maxBulletCount, "max-bullets", 5, "Maximum bullets per summary")
 	return cmd
 }
@@ -83,8 +84,9 @@ func cmdSummarize(mailbox string, a summarizeArgs) error {
 		return err
 	}
 	model := a.model
-	if model == "" {
-		model = cfg.Ollama.Model
+	llmc, err := llmclient.New(cfg.LLM)
+	if err != nil {
+		return cerr.Config("%s", err.Error())
 	}
 
 	c, err := imapclient.Dial(cfg.IMAP)
@@ -151,7 +153,7 @@ func cmdSummarize(mailbox string, a summarizeArgs) error {
 		for _, f := range fetched {
 			msgs = append(msgs, fetchedToLLMMessage(f, resolved))
 		}
-		sum, sErr := llm.SummarizeThread(ctx, cfg.Ollama.BaseURL, model, msgs, opts)
+		sum, sErr := llm.SummarizeThread(ctx, llmc, model, msgs, opts)
 		if sErr != nil {
 			return sErr
 		}
@@ -176,7 +178,7 @@ func cmdSummarize(mailbox string, a summarizeArgs) error {
 	succeeded := 0
 	for _, f := range fetched {
 		msg := fetchedToLLMMessage(f, resolved)
-		sum, sErr := llm.Summarize(ctx, cfg.Ollama.BaseURL, model, msg, opts)
+		sum, sErr := llm.Summarize(ctx, llmc, model, msg, opts)
 		if sErr != nil {
 			failed++
 			if perr := tio.PrintNDJSON(map[string]any{

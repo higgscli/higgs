@@ -43,19 +43,35 @@ func TestCmdAskArgsRequired(t *testing.T) {
 	}
 }
 
-func TestCmdAskEnvDefault(t *testing.T) {
-	t.Setenv("PM_OLLAMA_MODEL", "")
-	if got := askEnvDefault("PM_OLLAMA_MODEL", "gemma4"); got != "gemma4" {
-		t.Errorf("expected default gemma4, got %q", got)
+func TestCmdAskBackendConfigError(t *testing.T) {
+	// An invalid backend config must surface as a config error before the
+	// agent ever runs.
+	t.Setenv("PM_LLM_BACKEND", "openai")
+	t.Setenv("PM_OPENAI_BASE_URL", "")
+	t.Setenv("PM_OPENAI_MODEL", "")
+	mockAgentRun(t, agent.Answer{}, errors.New("should not be reached"))
+	err := cmdAsk("q", askOptions{maxSteps: 1})
+	if err == nil {
+		t.Fatal("expected config error")
 	}
-	t.Setenv("PM_OLLAMA_MODEL", "llama3")
-	if got := askEnvDefault("PM_OLLAMA_MODEL", "gemma4"); got != "llama3" {
-		t.Errorf("expected llama3, got %q", got)
+	if cerr.From(err).Kind != cerr.KindConfig {
+		t.Errorf("kind=%v want config", cerr.From(err).Kind)
 	}
-	// Whitespace-only env value falls back to default.
-	t.Setenv("PM_OLLAMA_MODEL", "   ")
-	if got := askEnvDefault("PM_OLLAMA_MODEL", "gemma4"); got != "gemma4" {
-		t.Errorf("whitespace should use default, got %q", got)
+}
+
+func TestCmdAskOpenAIBackendSelected(t *testing.T) {
+	t.Setenv("PM_LLM_BACKEND", "openai")
+	t.Setenv("PM_OPENAI_BASE_URL", "http://127.0.0.1:1")
+	t.Setenv("PM_OPENAI_MODEL", "qwen")
+	mockAgentRun(t, agent.Answer{Answer: "ok", Citations: []agent.Citation{}}, nil)
+	stdout, err := captureStdout(t, func() error {
+		return cmdAsk("q", askOptions{maxSteps: 1})
+	})
+	if err != nil {
+		t.Fatalf("cmdAsk: %v", err)
+	}
+	if !strings.Contains(stdout, "ok") {
+		t.Errorf("stdout=%q", stdout)
 	}
 }
 

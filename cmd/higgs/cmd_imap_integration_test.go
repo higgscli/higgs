@@ -517,9 +517,9 @@ func TestIntegration_StateStats_WithData(t *testing.T) {
 		t.Fatalf("state.Open: %v", err)
 	}
 	if err := db.MarkProcessed(&state.ProcessedMessage{
-		Mailbox:     "Folders/Accounts",
-		UIDValidity: 1,
-		UID:         1,
+		Mailbox:         "Folders/Accounts",
+		UIDValidity:     1,
+		UID:             1,
 		SuggestedLabels: []string{"Finance"},
 	}); err != nil {
 		t.Fatalf("MarkProcessed: %v", err)

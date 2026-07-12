@@ -243,12 +243,12 @@ func TestDraftInReplyToInvalidUID(t *testing.T) {
 
 func TestHasRePrefix(t *testing.T) {
 	cases := map[string]bool{
-		"Re: hi":  true,
-		"re: hi":  true,
-		"RE: x":   true,
-		"":        false,
-		"Fwd: x":  false,
-		"hello":   false,
+		"Re: hi": true,
+		"re: hi": true,
+		"RE: x":  true,
+		"":       false,
+		"Fwd: x": false,
+		"hello":  false,
 	}
 	for in, want := range cases {
 		if got := hasRePrefix(in); got != want {

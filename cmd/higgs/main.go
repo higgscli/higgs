@@ -18,11 +18,12 @@ var (
 func newRootCmd() *cobra.Command {
 	root := &cobra.Command{
 		Use:     "higgs",
-		Short:   "Local-only Proton Mail inbox management via IMAP + Ollama classification",
+		Short:   "Local-only Proton Mail inbox management via IMAP + local LLM classification",
 		Version: fmt.Sprintf("%s (commit %s, built %s)", version, commit, date),
-		Long: `higgs connects to Proton Mail Bridge over IMAP and uses a local Ollama
-model to classify, label, and organize your inbox. All output is structured
-JSON on stdout; progress and diagnostics go to stderr.`,
+		Long: `higgs connects to Proton Mail Bridge over IMAP and uses a local LLM
+(Ollama by default, or any OpenAI-compatible server such as llama.cpp via
+PM_LLM_BACKEND=openai) to classify, label, and organize your inbox. All output
+is structured JSON on stdout; progress and diagnostics go to stderr.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}

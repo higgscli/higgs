@@ -39,6 +39,58 @@ type ChatResponse struct {
 	DoneReason string `json:"done_reason,omitempty"`
 }
 
+// Chat sends a non-streaming chat request and returns the assistant message
+// content. format is passed through as the "format" field (a JSON schema or
+// the literal "json"); nil omits it for free-text output.
+func Chat(ctx context.Context, baseURL, model string, messages []ChatMessage, format json.RawMessage) (string, error) {
+	streamFalse := false
+	reqBody := ChatRequest{
+		Model:    model,
+		Messages: messages,
+		Stream:   &streamFalse,
+		Format:   format,
+	}
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", fmt.Errorf("marshal request: %w", err)
+	}
+
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return "", fmt.Errorf("parse base URL: %w", err)
+	}
+	u.Path = "/api/chat"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), bytes.NewReader(body))
+	if err != nil {
+		return "", fmt.Errorf("new request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "higgs/1.0")
+
+	client := &http.Client{Timeout: 120 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("ollama returned status %d", resp.StatusCode)
+	}
+
+	var chatResp ChatResponse
+	if err := json.NewDecoder(resp.Body).Decode(&chatResp); err != nil {
+		return "", fmt.Errorf("decode response: %w", err)
+	}
+
+	content := chatResp.Message.Content
+	if content == "" {
+		return "", fmt.Errorf("empty response content")
+	}
+	return content, nil
+}
+
 // ChatWithSchema sends a chat request with a JSON schema for structured output.
 // schema is marshalled to JSON and sent as the "format" field (per Ollama API: format can be "json" or a JSON schema).
 // Stream is set to false so the server returns a single JSON response; the official client uses streaming by default.
@@ -48,52 +100,10 @@ func ChatWithSchema(ctx context.Context, baseURL, model string, messages []ChatM
 	if err != nil {
 		return fmt.Errorf("marshal format schema: %w", err)
 	}
-	streamFalse := false
-	reqBody := ChatRequest{
-		Model:    model,
-		Messages: messages,
-		Stream:   &streamFalse,
-		Format:   formatBytes,
-	}
-	body, err := json.Marshal(reqBody)
+	content, err := Chat(ctx, baseURL, model, messages, formatBytes)
 	if err != nil {
-		return fmt.Errorf("marshal request: %w", err)
+		return err
 	}
-
-	u, err := url.Parse(baseURL)
-	if err != nil {
-		return fmt.Errorf("parse base URL: %w", err)
-	}
-	u.Path = "/api/chat"
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), bytes.NewReader(body))
-	if err != nil {
-		return fmt.Errorf("new request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "higgs/1.0")
-
-	client := &http.Client{Timeout: 120 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("ollama returned status %d", resp.StatusCode)
-	}
-
-	var chatResp ChatResponse
-	if err := json.NewDecoder(resp.Body).Decode(&chatResp); err != nil {
-		return fmt.Errorf("decode response: %w", err)
-	}
-
-	content := chatResp.Message.Content
-	if content == "" {
-		return fmt.Errorf("empty response content")
-	}
-
 	if err := json.Unmarshal([]byte(content), out); err != nil {
 		return fmt.Errorf("parse JSON output: %w (raw: %q)", err, content)
 	}

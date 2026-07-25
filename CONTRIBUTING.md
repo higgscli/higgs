@@ -5,7 +5,7 @@ workflow, PR expectations, and the commit convention.
 
 ## Prerequisites
 
-- Go 1.25 or newer
+- Go 1.26.5 or newer
 - `make`
 - For running the tool locally: [Proton Mail Bridge](https://proton.me/mail/bridge)
   and [Ollama](https://ollama.com/) with a pulled model (e.g. `ollama pull gemma4`).

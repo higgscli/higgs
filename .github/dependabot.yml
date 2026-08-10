@@ -24,3 +24,11 @@ updates:
     labels:
       - dependencies
       - github-actions
+    groups:
+      # CodeQL compares the version reported by the init and analyze steps and
+      # fails the run when they differ. Dependabot otherwise splits the bump
+      # into one PR per action path, so neither PR can pass or merge on its own
+      # (hit on #19/#20, #22/#24 and #27/#29). Grouping keeps them in one PR.
+      codeql-action:
+        patterns:
+          - "github/codeql-action*"

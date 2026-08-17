@@ -39,13 +39,19 @@ The default model is [Gemma 4](https://ollama.com/library/gemma4), chosen becaus
    ```
 3. Install `higgs`:
    ```bash
-   # Homebrew (macOS & Linux)
+   # Homebrew (macOS) — signed and notarized
    brew tap higgscli/higgs
-   brew install higgs
+   brew install --cask higgs
 
-   # go install
+   # go install (macOS, Linux, Windows)
    go install github.com/higgscli/higgs/cmd/higgs@latest
    ```
+
+   Linux and Windows builds ship as signed archives on the
+   [releases page](https://github.com/higgscli/higgs/releases/latest) —
+   download, verify against `checksums.txt`, and drop the binary on your `PATH`.
+   Homebrew installs are macOS-only: upstream distributes precompiled binaries
+   as casks, and Homebrew does not support casks on Linux.
  
    Or build from source:
    ```

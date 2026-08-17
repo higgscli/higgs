@@ -7,7 +7,8 @@ Proton AG; keep the trademark disclaimer intact wherever it appears.
 
 Sibling repos in the [higgscli org](https://github.com/higgscli):
 `website` (higgscli.com — Cloudflare Worker `higgscli`) and `homebrew-higgs`
-(tap; `Formula/higgs.rb` is GoReleaser-generated — **never hand-edit it**).
+(tap; `Casks/higgs.rb` is GoReleaser-generated — **never hand-edit it**).
+The tap is a **cask**, not a formula, as of v1.2.5 — macOS only.
 
 ## Layout
 

@@ -53,11 +53,22 @@ archives:
       - README.md
       - CHANGELOG.md
 
-brews:
+# Homebrew casks. Replaces the former `brews:` (formula) block, which GoReleaser
+# soft-deprecated in v2.10 and hard-deprecated in v2.16 — upstream is moving all
+# precompiled-binary distribution from formulas to casks.
+#
+# Casks are macOS-only, so Linux Homebrew is no longer a supported install path;
+# Linux users take `go install` or the release tarballs (see README).
+#
+# Deliberately NO `hooks.post.install` xattr/quarantine strip: scripts/macos-sign.sh
+# already Developer ID-signs (hardened runtime) and notarizes every darwin binary,
+# so Gatekeeper clears them on its own. Stripping com.apple.quarantine would
+# disable that check for no gain.
+homebrew_casks:
   - name: higgs
-    # brew only scans Formula/ when the directory exists; goreleaser's
-    # default (tap root) leaves installs pointing at the old formula.
-    directory: Formula
+    binaries:
+      - higgs
+    directory: Casks
     repository:
       owner: higgscli
       name: homebrew-higgs
@@ -66,15 +77,12 @@ brews:
     commit_author:
       name: github-actions[bot]
       email: 41898282+github-actions[bot]@users.noreply.github.com
-    commit_msg_template: "Brew formula update for {{ .ProjectName }} {{ .Tag }}"
+    commit_msg_template: "Brew cask update for {{ .ProjectName }} {{ .Tag }}"
     homepage: "https://github.com/higgscli/higgs"
     description: "Agent-first CLI for Proton Mail with schema, NDJSON and typed errors"
-    license: "Apache-2.0"
     skip_upload: auto
-    install: |
-      bin.install "higgs"
-    test: |
-      system "#{bin}/higgs", "--version"
+    url:
+      verified: "github.com/higgscli/higgs/"
 
 checksum:
   name_template: "checksums.txt"

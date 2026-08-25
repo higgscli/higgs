@@ -303,7 +303,7 @@ func Send(cfg Config, from string, to []string, msg []byte) error {
 	if err != nil {
 		return err
 	}
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 	if ok, _ := c.Extension("STARTTLS"); ok {
 		tlsCfg := &tls.Config{ServerName: cfg.Host, InsecureSkipVerify: cfg.TLSSkipVerify}
 		if err := c.StartTLS(tlsCfg); err != nil {

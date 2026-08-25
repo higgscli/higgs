@@ -87,7 +87,25 @@ func cmdSend(f *sendFlags) error {
 
 	smtpCfg, ok := smtp.ConfigFromEnv()
 	if !ok {
-		return cerr.Config("SMTP not configured: set PM_SMTP_HOST and PM_SMTP_PORT")
+		// Default to Proton Mail Bridge's SMTP endpoint, mirroring the IMAP
+		// side's Bridge-first defaults (127.0.0.1:1143 there, :1025 here).
+		// Bridge shares one credential pair across IMAP and SMTP, so reuse
+		// the resolved IMAP credentials (env or keystore).
+		if cfg.IMAP.Username == "" {
+			loaded, err := config.LoadFromEnv()
+			if err != nil {
+				return cerr.Config("SMTP not configured: set PM_SMTP_HOST and PM_SMTP_PORT, or run 'higgs auth login' for Proton Mail Bridge (%s)", err.Error())
+			}
+			cfg = loaded
+		}
+		smtpCfg = smtp.Config{
+			Host:          "127.0.0.1",
+			Port:          1025,
+			Username:      cfg.IMAP.Username,
+			Password:      cfg.IMAP.Password,
+			TLSSkipVerify: true,
+		}
+		termio.Info("SMTP env not set; defaulting to Proton Mail Bridge at %s", smtpCfg.Addr())
 	}
 
 	recipients := append(append([]string{}, env.To...), env.Cc...)

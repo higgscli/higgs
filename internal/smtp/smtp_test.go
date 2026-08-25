@@ -220,6 +220,50 @@ func TestConfigFromEnv(t *testing.T) {
 	}
 }
 
+func TestConfigFromEnvTLSSkipVerify(t *testing.T) {
+	t.Setenv("PM_SMTP_USERNAME", "")
+	t.Setenv("PM_SMTP_PASSWORD", "")
+	t.Setenv("PM_SMTP_TLS_SKIP_VERIFY", "")
+
+	t.Setenv("PM_SMTP_HOST", "smtp.example.com")
+	t.Setenv("PM_SMTP_PORT", "587")
+	if cfg, _ := ConfigFromEnv(); cfg.TLSSkipVerify {
+		t.Error("non-loopback host should verify by default")
+	}
+
+	t.Setenv("PM_SMTP_HOST", "127.0.0.1")
+	if cfg, _ := ConfigFromEnv(); !cfg.TLSSkipVerify {
+		t.Error("loopback host should skip verification by default")
+	}
+
+	t.Setenv("PM_SMTP_TLS_SKIP_VERIFY", "false")
+	if cfg, _ := ConfigFromEnv(); cfg.TLSSkipVerify {
+		t.Error("explicit false should win over loopback default")
+	}
+
+	t.Setenv("PM_SMTP_HOST", "smtp.example.com")
+	t.Setenv("PM_SMTP_TLS_SKIP_VERIFY", "true")
+	if cfg, _ := ConfigFromEnv(); !cfg.TLSSkipVerify {
+		t.Error("explicit true should win over non-loopback default")
+	}
+}
+
+func TestIsLoopback(t *testing.T) {
+	for host, want := range map[string]bool{
+		"127.0.0.1":        true,
+		"::1":              true,
+		"localhost":        true,
+		"LOCALHOST":        true,
+		"smtp.example.com": false,
+		"192.168.1.10":     false,
+		"":                 false,
+	} {
+		if got := IsLoopback(host); got != want {
+			t.Errorf("IsLoopback(%q) = %v, want %v", host, got, want)
+		}
+	}
+}
+
 func TestSendInvalidAddr(t *testing.T) {
 	err := Send(Config{Host: "127.0.0.1", Port: 1}, "a@x.com\r\nX: y", []string{"b@x.com"}, []byte("msg"))
 	if err == nil {

@@ -8,11 +8,13 @@ package smtp
 
 import (
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"mime/quotedprintable"
+	"net"
 	"net/smtp"
 	"os"
 	"sort"
@@ -272,6 +274,10 @@ type Config struct {
 	Port     int
 	Username string
 	Password string
+	// TLSSkipVerify disables certificate verification during STARTTLS.
+	// Proton Mail Bridge serves a self-signed certificate on loopback, so
+	// this defaults to true for loopback hosts (mirroring the IMAP side).
+	TLSSkipVerify bool
 }
 
 // Addr returns "host:port".
@@ -279,9 +285,11 @@ func (c Config) Addr() string {
 	return fmt.Sprintf("%s:%d", c.Host, c.Port)
 }
 
-// Send delivers raw RFC5322 bytes to cfg's SMTP server using stdlib net/smtp
-// with PLAIN auth when credentials are set. Recipients are the combined
-// To/Cc/Bcc list.
+// Send delivers raw RFC5322 bytes to cfg's SMTP server, upgrading to TLS via
+// STARTTLS when the server advertises it and using PLAIN auth when credentials
+// are set. Recipients are the combined To/Cc/Bcc list. Unlike net/smtp.SendMail
+// this honors cfg.TLSSkipVerify, which Bridge's self-signed loopback
+// certificate requires.
 func Send(cfg Config, from string, to []string, msg []byte) error {
 	if err := validateAddr(from); err != nil {
 		return err
@@ -291,15 +299,59 @@ func Send(cfg Config, from string, to []string, msg []byte) error {
 			return err
 		}
 	}
-	var auth smtp.Auth
-	if cfg.Username != "" {
-		auth = smtp.PlainAuth("", cfg.Username, cfg.Password, cfg.Host)
+	c, err := smtp.Dial(cfg.Addr())
+	if err != nil {
+		return err
 	}
-	return smtp.SendMail(cfg.Addr(), auth, from, to, msg)
+	defer func() { _ = c.Close() }()
+	if ok, _ := c.Extension("STARTTLS"); ok {
+		tlsCfg := &tls.Config{ServerName: cfg.Host, InsecureSkipVerify: cfg.TLSSkipVerify}
+		if err := c.StartTLS(tlsCfg); err != nil {
+			return err
+		}
+	}
+	if cfg.Username != "" {
+		if ok, _ := c.Extension("AUTH"); ok {
+			auth := smtp.PlainAuth("", cfg.Username, cfg.Password, cfg.Host)
+			if err := c.Auth(auth); err != nil {
+				return err
+			}
+		}
+	}
+	if err := c.Mail(from); err != nil {
+		return err
+	}
+	for _, r := range to {
+		if err := c.Rcpt(r); err != nil {
+			return err
+		}
+	}
+	w, err := c.Data()
+	if err != nil {
+		return err
+	}
+	if _, err := w.Write(msg); err != nil {
+		return err
+	}
+	if err := w.Close(); err != nil {
+		return err
+	}
+	return c.Quit()
+}
+
+// IsLoopback reports whether host is a loopback address ("localhost", 127.x,
+// ::1), matching the IMAP side's default for TLS verification.
+func IsLoopback(host string) bool {
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 // ConfigFromEnv reads PM_SMTP_HOST/PM_SMTP_PORT/PM_SMTP_USERNAME/PM_SMTP_PASSWORD.
-// Returns (_, false) when host or port is unset.
+// Returns (_, false) when host or port is unset. PM_SMTP_TLS_SKIP_VERIFY
+// overrides the loopback-based default for certificate verification.
 func ConfigFromEnv() (Config, bool) {
 	host := strings.TrimSpace(os.Getenv("PM_SMTP_HOST"))
 	portStr := strings.TrimSpace(os.Getenv("PM_SMTP_PORT"))
@@ -311,10 +363,15 @@ func ConfigFromEnv() (Config, bool) {
 	if err != nil || port <= 0 {
 		return Config{}, false
 	}
+	skipVerify := IsLoopback(host)
+	if v := strings.TrimSpace(os.Getenv("PM_SMTP_TLS_SKIP_VERIFY")); v != "" {
+		skipVerify = strings.EqualFold(v, "true")
+	}
 	return Config{
-		Host:     host,
-		Port:     port,
-		Username: os.Getenv("PM_SMTP_USERNAME"),
-		Password: os.Getenv("PM_SMTP_PASSWORD"),
+		Host:          host,
+		Port:          port,
+		Username:      os.Getenv("PM_SMTP_USERNAME"),
+		Password:      os.Getenv("PM_SMTP_PASSWORD"),
+		TLSSkipVerify: skipVerify,
 	}, true
 }

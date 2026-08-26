@@ -1,6 +1,6 @@
 # higgs
 
-Agent-first, local-only CLI for Proton Mail (Go 1.26, Cobra). Privacy is the
+Agent-first, local-only CLI for Proton Mail (Go 1.27, Cobra). Privacy is the
 brand: everything runs on localhost (Proton Mail Bridge + Ollama), no cloud
 inference, no API keys, no telemetry. Unofficial project — not affiliated with
 Proton AG; keep the trademark disclaimer intact wherever it appears.

@@ -19,6 +19,7 @@ import (
 	"github.com/higgscli/higgs/internal/imapclient"
 	"github.com/higgscli/higgs/internal/imapfetch"
 	"github.com/higgscli/higgs/internal/imaputil"
+	"github.com/higgscli/higgs/internal/jev"
 	"github.com/higgscli/higgs/internal/llmclient"
 	"github.com/higgscli/higgs/internal/parse"
 	"github.com/higgscli/higgs/internal/state"
@@ -35,7 +36,12 @@ func newClassifyCmd() *cobra.Command {
 backend — Ollama by default, or an OpenAI-compatible server such as llama.cpp
 via PM_LLM_BACKEND=openai — (suggested labels +
 mailing-list detection), emit one NDJSON line per message to stdout. Uses
-SQLite to track processed messages for idempotency.`,
+SQLite to track processed messages for idempotency.
+
+Set PM_CLASSIFY_BACKEND=jev to classify with a Jev decision server instead
+(PM_JEV_BASE_URL, default http://127.0.0.1:8791): one scoring pass per message
+with calibrated probabilities, no text generation. Other commands keep using
+PM_LLM_BACKEND.`,
 		Args: cobra.MaximumNArgs(1),
 		Annotations: map[string]string{
 			"stdout_format": "ndjson",
@@ -69,6 +75,18 @@ SQLite to track processed messages for idempotency.`,
 	return cmd
 }
 
+// newClassifier builds the classifier selected by PM_CLASSIFY_BACKEND.
+func newClassifier(cfg config.Config) (classify.Classifier, error) {
+	if cfg.Classify.Backend == config.ClassifyBackendJev {
+		return classify.JevClassifier{Client: jev.New(cfg.Classify.JevBaseURL)}, nil
+	}
+	llmc, err := llmclient.New(cfg.LLM)
+	if err != nil {
+		return nil, err
+	}
+	return classify.LLMClassifier{Client: llmc}, nil
+}
+
 type classifyJob struct {
 	msg     email.Message
 	fetched imapfetch.FetchedMessage
@@ -88,7 +106,7 @@ func cmdClassify(mailbox string, dryRun, apply bool, limitFlag int, noState, rep
 	if err != nil {
 		return cerr.Config("%s", err.Error())
 	}
-	llmc, err := llmclient.New(cfg.LLM)
+	classifier, err := newClassifier(cfg)
 	if err != nil {
 		return cerr.Config("%s", err.Error())
 	}
@@ -254,7 +272,7 @@ func cmdClassify(mailbox string, dryRun, apply bool, limitFlag int, noState, rep
 		go func(workerID int) {
 			defer wg.Done()
 			for job := range jobs {
-				result, err := classify.Classify(ctx, llmc, "", &job.msg)
+				result, err := classifier.Classify(ctx, &job.msg)
 				results <- classifyResult{
 					msg:    job.msg,
 					result: result,

@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/higgscli/higgs/internal/cerr"
+	"github.com/higgscli/higgs/internal/jev"
 	"github.com/higgscli/higgs/internal/keystore"
 	"github.com/higgscli/higgs/internal/llmclient"
 	"github.com/higgscli/higgs/internal/termio"
@@ -44,6 +45,23 @@ type Config struct {
 	// LLM selects and configures the chat backend (PM_LLM_BACKEND: ollama or
 	// openai). Ollama above is kept in sync for backward compatibility.
 	LLM llmclient.Config
+	// Classify selects the backend `higgs classify` uses (PM_CLASSIFY_BACKEND).
+	Classify ClassifyConfig
+}
+
+// Classify backends. ClassifyBackendLLM uses the PM_LLM_BACKEND chat model;
+// ClassifyBackendJev uses a Jev decision server.
+const (
+	ClassifyBackendLLM = "llm"
+	ClassifyBackendJev = "jev"
+)
+
+type ClassifyConfig struct {
+	// Backend is ClassifyBackendLLM (default) or ClassifyBackendJev.
+	Backend string
+	// JevBaseURL is the decision server URL (PM_JEV_BASE_URL) when Backend
+	// is jev.
+	JevBaseURL string
 }
 
 // LoadFromEnv loads config from environment. Default host/port match Proton Mail Bridge
@@ -89,6 +107,11 @@ func LoadFromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, cerr.Config("%s", err.Error())
 	}
+	classifyCfg, err := loadClassifyConfig()
+	if err != nil {
+		return Config{}, cerr.Config("%s", err.Error())
+	}
+
 	if llmCfg.Backend == llmclient.BackendOpenAI {
 		termio.Info("LLM backend: openai base_url=%s model=%s", llmCfg.OpenAIBaseURL, llmCfg.OpenAIModel)
 	} else {
@@ -108,8 +131,25 @@ func LoadFromEnv() (Config, error) {
 			BaseURL: llmCfg.OllamaBaseURL,
 			Model:   llmCfg.OllamaModel,
 		},
-		LLM: llmCfg,
+		LLM:      llmCfg,
+		Classify: classifyCfg,
 	}, nil
+}
+
+// loadClassifyConfig reads PM_CLASSIFY_BACKEND (llm or jev; default llm) and,
+// for jev, PM_JEV_BASE_URL.
+func loadClassifyConfig() (ClassifyConfig, error) {
+	backend := strings.ToLower(getEnvDefault("PM_CLASSIFY_BACKEND", ClassifyBackendLLM))
+	switch backend {
+	case ClassifyBackendLLM:
+		return ClassifyConfig{Backend: backend}, nil
+	case ClassifyBackendJev:
+		cfg := ClassifyConfig{Backend: backend, JevBaseURL: jev.BaseURLFromEnv()}
+		termio.Info("Classify backend: jev base_url=%s", cfg.JevBaseURL)
+		return cfg, nil
+	default:
+		return ClassifyConfig{}, fmt.Errorf("PM_CLASSIFY_BACKEND must be %q or %q (got %q)", ClassifyBackendLLM, ClassifyBackendJev, backend)
+	}
 }
 
 // resolveCredentials looks up IMAP credentials from (in priority order):

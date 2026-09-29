@@ -166,7 +166,7 @@ higgs scan-folders
  
 ### classify
  
-Stream messages through Ollama and emit one NDJSON object per message, followed by a `summary` terminator. Add `--apply` to write labels back to IMAP in the same pass.
+Stream messages through the configured model (Ollama by default, or a Jev decision server with `PM_CLASSIFY_BACKEND=jev`) and emit one NDJSON object per message, followed by a `summary` terminator. Add `--apply` to write labels back to IMAP in the same pass.
  
 ```
 higgs classify --dry-run --limit 20 INBOX
@@ -325,6 +325,47 @@ PM_OPENAI_BASE_URL=http://localhost:8080 \
 PM_OPENAI_MODEL=qwen3.6-35b-a3b \
 higgs classify INBOX --limit 20 --dry-run
 ```
+
+### Classify backend (Jev decision models)
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `PM_CLASSIFY_BACKEND` | `llm` | Backend for `classify`: `llm` (the `PM_LLM_BACKEND` chat model) or `jev` |
+| `PM_JEV_BASE_URL` | `http://127.0.0.1:8791` | Jev decision server base URL (`PM_CLASSIFY_BACKEND=jev`) |
+
+With `PM_CLASSIFY_BACKEND=jev`, `classify` sends each message to a
+[Jev](https://github.com/Zefan-Cai/Open-Jev)-style decision server instead of
+a chat model. A decision model doesn't generate text: it scores the options
+in one forward pass and returns calibrated probabilities. higgs asks two
+questions per message in one request — a yes/no "is this bulk mail?"
+(`is_mailing_list`) and a choice over the 11 taxonomy labels (the top label,
+plus the runner-up when its probability is at least 0.3). `confidence` is the
+top label's probability and `rationale` lists the probabilities, so the NDJSON
+and state DB rows keep the same shape. Only the first 1,200 characters of the
+body are sent. Other commands (`summarize`, `digest`, `ask`, `extract`) keep
+using `PM_LLM_BACKEND`.
+
+The server is the open-source Open-Jev loader serving
+[Open-Jev-2B](https://huggingface.co/gionebeats/Open-Jev-2B) (a LoRA adapter
+and decision head on Qwen3.5-2B; needs an NVIDIA GPU with about 6 GB free):
+
+```
+git clone https://github.com/Zefan-Cai/Open-Jev.git && cd Open-Jev
+python -m pip install -e '.[train]'
+hf download ZefanCai/Open-Jev-2B --local-dir ./checkpoints/open-jev-2b
+python -m jev.server --checkpoint ./checkpoints/open-jev-2b/package/checkpoint \
+  --device cuda:0 --max-length 4096 --batch-size 16 --no-prefix-cache \
+  --host 127.0.0.1 --port 8791
+
+PM_CLASSIFY_BACKEND=jev higgs classify INBOX --limit 20 --dry-run
+```
+
+`--batch-size 16` matters: the server scores each option as its own sequence
+and batches them, which was about 3.7x faster than the default of 1 in our
+tests. Installing the `causal-conv1d` CUDA kernel in the server's environment
+gave another ~25%. The server scores one request at a time, but a few
+`--workers` still help by overlapping network round trips (59 messages took
+28.6 s with 1 worker and 20.4 s with 4).
  
 ### Classify tuning
  

@@ -19,6 +19,7 @@ func clearAllEnv(t *testing.T) {
 		"PM_IMAP_SECURITY", "PM_IMAP_TLS", "PM_IMAP_TLS_SKIP_VERIFY",
 		"PM_OLLAMA_BASE_URL", "PM_OLLAMA_MODEL",
 		"PM_LLM_BACKEND", "PM_OPENAI_BASE_URL", "PM_OPENAI_API_KEY", "PM_OPENAI_MODEL",
+		"PM_CLASSIFY_BACKEND", "PM_JEV_BASE_URL",
 		"PM_KEYSTORE_PATH", "PM_KEYSTORE_PASSPHRASE",
 	} {
 		t.Setenv(key, "") // restored after test
@@ -80,6 +81,41 @@ func TestLoadFromEnv_LLMBackendOpenAIMissingConfig(t *testing.T) {
 	_, err := LoadFromEnv()
 	if err == nil || !strings.Contains(err.Error(), "PM_OPENAI_BASE_URL") {
 		t.Fatalf("want PM_OPENAI_BASE_URL config error, got %v", err)
+	}
+}
+
+func TestLoadFromEnv_ClassifyBackend(t *testing.T) {
+	cases := []struct {
+		name, backend, baseURL string
+		wantBackend, wantURL   string
+		wantErr                string
+	}{
+		{name: "default is llm", wantBackend: "llm"},
+		{name: "jev default url", backend: "jev", wantBackend: "jev", wantURL: "http://127.0.0.1:8791"},
+		{name: "jev custom url", backend: "JEV", baseURL: "http://10.1.1.8:8791/", wantBackend: "jev", wantURL: "http://10.1.1.8:8791"},
+		{name: "invalid", backend: "gpt", wantErr: "PM_CLASSIFY_BACKEND"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			clearAllEnv(t)
+			t.Setenv("PM_IMAP_USERNAME", "u@x")
+			t.Setenv("PM_IMAP_PASSWORD", "pw")
+			t.Setenv("PM_CLASSIFY_BACKEND", tc.backend)
+			t.Setenv("PM_JEV_BASE_URL", tc.baseURL)
+			cfg, err := LoadFromEnv()
+			if tc.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+					t.Fatalf("want %s error, got %v", tc.wantErr, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("LoadFromEnv: %v", err)
+			}
+			if cfg.Classify.Backend != tc.wantBackend || cfg.Classify.JevBaseURL != tc.wantURL {
+				t.Errorf("classify cfg=%+v", cfg.Classify)
+			}
+		})
 	}
 }
 

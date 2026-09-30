@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `PM_CLASSIFY_BACKEND=jev`: `higgs classify` can use a Jev-style decision
+  server (the open-source Open-Jev `/v1/systemone` API, e.g. Open-Jev-2B)
+  instead of a chat model. Each message gets one request with two typed
+  questions — yes/no bulk-mail detection and a choice over the label
+  taxonomy — and calibrated probabilities become `is_mailing_list`,
+  `suggested_labels` and `confidence`. No text generation, so no malformed
+  JSON and no generation timeouts. `PM_JEV_BASE_URL` sets the server
+  (default `http://127.0.0.1:8791`). Other commands keep using
+  `PM_LLM_BACKEND`.
+
+### Changed
+
+- Dependencies: modernc.org/sqlite 1.60.1, golang.org/x/crypto 0.57.0,
+  golang.org/x/term 0.46.0 and indirect modules; codecov-action v7.1.1,
+  codeql-action v4.37.9, sbom-action/download-syft v0.24.2.
+
 ## [1.1.1] - 2026-07-09
 
 ### Fixed

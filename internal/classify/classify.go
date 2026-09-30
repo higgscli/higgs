@@ -89,6 +89,12 @@ func Classify(ctx context.Context, c llmclient.Client, model string, msg *email.
 		return nil, fmt.Errorf("llm: %w", err)
 	}
 
+	return finalize(&result, msg), nil
+}
+
+// finalize normalizes a raw model result onto the canonical taxonomy and
+// logs it. Shared by every classifier backend so they emit identical output.
+func finalize(result *Result, msg *email.Message) *Result {
 	// Normalize labels to canonical set
 	result.SuggestedLabels = normalizeLabels(result.SuggestedLabels)
 
@@ -108,7 +114,7 @@ func Classify(ctx context.Context, c llmclient.Client, model string, msg *email.
 
 	termio.Info("classified uid=%d subject=%q labels=%v is_mailing_list=%v",
 		msg.UID, truncate(msg.Subject, 40), result.SuggestedLabels, result.IsMailingList)
-	return &result, nil
+	return result
 }
 
 // normalizeLabels maps AI-generated labels to the canonical label set via the

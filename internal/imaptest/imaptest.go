@@ -330,7 +330,8 @@ func Start(t testing.TB, opts ...Option) *Server {
 		// during Serve is the normal shutdown signal and yields a non-nil
 		// error that we don't care about.
 		select {
-		case <-serveErr:
+		case err := <-serveErr:
+			_ = err
 		case <-time.After(2 * time.Second):
 		}
 	}

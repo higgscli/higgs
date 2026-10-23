@@ -18,6 +18,7 @@ import (
 	"net/smtp"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -365,7 +366,10 @@ func ConfigFromEnv() (Config, bool) {
 	}
 	skipVerify := IsLoopback(host)
 	if v := strings.TrimSpace(os.Getenv("PM_SMTP_TLS_SKIP_VERIFY")); v != "" {
-		skipVerify = strings.EqualFold(v, "true")
+		// Same spellings as PM_IMAP_TLS_SKIP_VERIFY; anything unparseable
+		// keeps verification on.
+		b, err := strconv.ParseBool(v)
+		skipVerify = err == nil && b
 	}
 	return Config{
 		Host:          host,

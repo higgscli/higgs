@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -23,12 +24,26 @@ import (
 type fakeSMTP struct {
 	mu   sync.Mutex
 	data bytes.Buffer
-	host string
-	port int
-	done chan struct{}
+	// authLine is the raw AUTH command the client sent, if any.
+	authLine string
+	host     string
+	port     int
+	done     chan struct{}
 }
 
 func startFakeSMTP(t *testing.T) *fakeSMTP {
+	t.Helper()
+	return startFakeSMTPServer(t, false)
+}
+
+// startFakeSMTPWithAuth is startFakeSMTP with AUTH PLAIN advertised, so the
+// client authenticates whenever it has a username.
+func startFakeSMTPWithAuth(t *testing.T) *fakeSMTP {
+	t.Helper()
+	return startFakeSMTPServer(t, true)
+}
+
+func startFakeSMTPServer(t *testing.T, advertiseAuth bool) *fakeSMTP {
 	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -66,7 +81,16 @@ func startFakeSMTP(t *testing.T) *fakeSMTP {
 			}
 			switch verb := strings.ToUpper(strings.TrimSpace(line)); {
 			case strings.HasPrefix(verb, "EHLO"), strings.HasPrefix(verb, "HELO"):
-				fmt.Fprint(conn, "250-fake greets you\r\n250 HELP\r\n")
+				if advertiseAuth {
+					fmt.Fprint(conn, "250-fake greets you\r\n250-AUTH PLAIN\r\n250 HELP\r\n")
+				} else {
+					fmt.Fprint(conn, "250-fake greets you\r\n250 HELP\r\n")
+				}
+			case strings.HasPrefix(verb, "AUTH"):
+				f.mu.Lock()
+				f.authLine = strings.TrimSpace(line)
+				f.mu.Unlock()
+				fmt.Fprint(conn, "235 2.7.0 Authentication successful\r\n")
 			case strings.HasPrefix(verb, "MAIL"):
 				fmt.Fprint(conn, "250 2.1.0 OK\r\n")
 			case strings.HasPrefix(verb, "RCPT"):
@@ -91,6 +115,8 @@ func (f *fakeSMTP) apply(t *testing.T) {
 	t.Setenv("PM_SMTP_PORT", strconv.Itoa(f.port))
 	t.Setenv("PM_SMTP_USERNAME", "")
 	t.Setenv("PM_SMTP_PASSWORD", "")
+	// Never read the developer's real keyring from a test.
+	t.Setenv("PM_DISABLE_KEYSTORE", "1")
 }
 
 func (f *fakeSMTP) waitDone(t *testing.T) {
@@ -100,6 +126,31 @@ func (f *fakeSMTP) waitDone(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("fake SMTP server did not finish handshake")
 	}
+}
+
+// auth returns the username and password from the client's AUTH PLAIN
+// command, and false when the client did not authenticate.
+func (f *fakeSMTP) auth(t *testing.T) (string, string, bool) {
+	t.Helper()
+	f.mu.Lock()
+	line := f.authLine
+	f.mu.Unlock()
+	if line == "" {
+		return "", "", false
+	}
+	fields := strings.Fields(line)
+	if len(fields) != 3 || !strings.EqualFold(fields[1], "PLAIN") {
+		t.Fatalf("unexpected AUTH command: %q", line)
+	}
+	decoded, err := base64.StdEncoding.DecodeString(fields[2])
+	if err != nil {
+		t.Fatalf("decode AUTH PLAIN: %v", err)
+	}
+	parts := strings.Split(string(decoded), "\x00")
+	if len(parts) != 3 {
+		t.Fatalf("AUTH PLAIN has %d parts, want 3", len(parts))
+	}
+	return parts[1], parts[2], true
 }
 
 func (f *fakeSMTP) body() string {
@@ -344,5 +395,73 @@ func TestSendSavesToSent(t *testing.T) {
 	}
 	if status.Messages < 1 {
 		t.Errorf("Sent empty: %d", status.Messages)
+	}
+}
+
+// sendTo runs `higgs send` against srv with an explicit --from, so the IMAP
+// side is not otherwise needed.
+func sendTo(t *testing.T, srv *fakeSMTP) {
+	t.Helper()
+	body := writeBody(t, "hello")
+	cmd := newSendCmd()
+	cmd.SetArgs([]string{"--from", "me@example.com", "--to", "user@example.com", "--body-file", body})
+	stdout, err := captureStdout(t, func() error { return cmd.Execute() })
+	if err != nil {
+		t.Fatalf("send: %v (%s)", err, stdout)
+	}
+	srv.waitDone(t)
+}
+
+// A custom SMTP host (for example Bridge reached from a container as
+// host.docker.internal) authenticates with the stored Bridge credentials when
+// PM_SMTP_USERNAME and PM_SMTP_PASSWORD are unset, the same as the Bridge
+// default path does.
+func TestSendCustomSMTPHostUsesStoredCredentials(t *testing.T) {
+	srv := startFakeSMTPWithAuth(t)
+	srv.apply(t)
+	t.Setenv("PM_IMAP_USERNAME", "alice@proton.me")
+	t.Setenv("PM_IMAP_PASSWORD", "bridge-password")
+
+	sendTo(t, srv)
+
+	user, pass, ok := srv.auth(t)
+	if !ok {
+		t.Fatal("client did not authenticate")
+	}
+	if user != "alice@proton.me" || pass != "bridge-password" {
+		t.Errorf("auth: got %q/%q, want the stored Bridge credentials", user, pass)
+	}
+}
+
+func TestSendExplicitSMTPCredentialsWin(t *testing.T) {
+	srv := startFakeSMTPWithAuth(t)
+	srv.apply(t)
+	t.Setenv("PM_SMTP_USERNAME", "relay-user")
+	t.Setenv("PM_SMTP_PASSWORD", "relay-password")
+	t.Setenv("PM_IMAP_USERNAME", "alice@proton.me")
+	t.Setenv("PM_IMAP_PASSWORD", "bridge-password")
+
+	sendTo(t, srv)
+
+	user, pass, ok := srv.auth(t)
+	if !ok {
+		t.Fatal("client did not authenticate")
+	}
+	if user != "relay-user" || pass != "relay-password" {
+		t.Errorf("auth: got %q/%q, want the PM_SMTP_* credentials", user, pass)
+	}
+}
+
+// A relay that needs no login still works when no credentials are stored.
+func TestSendCustomSMTPHostWithoutStoredCredentialsSkipsAuth(t *testing.T) {
+	srv := startFakeSMTPWithAuth(t)
+	srv.apply(t)
+	t.Setenv("PM_IMAP_USERNAME", "")
+	t.Setenv("PM_IMAP_PASSWORD", "")
+
+	sendTo(t, srv)
+
+	if _, _, ok := srv.auth(t); ok {
+		t.Error("client authenticated without any credentials")
 	}
 }

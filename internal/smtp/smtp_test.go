@@ -246,6 +246,21 @@ func TestConfigFromEnvTLSSkipVerify(t *testing.T) {
 	if cfg, _ := ConfigFromEnv(); !cfg.TLSSkipVerify {
 		t.Error("explicit true should win over non-loopback default")
 	}
+
+	// The same boolean spellings PM_IMAP_TLS_SKIP_VERIFY accepts.
+	for _, v := range []string{"1", "t", "TRUE", "True"} {
+		t.Setenv("PM_SMTP_TLS_SKIP_VERIFY", v)
+		if cfg, _ := ConfigFromEnv(); !cfg.TLSSkipVerify {
+			t.Errorf("%q should skip verification", v)
+		}
+	}
+	t.Setenv("PM_SMTP_HOST", "127.0.0.1")
+	for _, v := range []string{"0", "f", "FALSE"} {
+		t.Setenv("PM_SMTP_TLS_SKIP_VERIFY", v)
+		if cfg, _ := ConfigFromEnv(); cfg.TLSSkipVerify {
+			t.Errorf("%q should verify", v)
+		}
+	}
 }
 
 func TestIsLoopback(t *testing.T) {

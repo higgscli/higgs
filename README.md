@@ -289,6 +289,18 @@ If `PM_IMAP_USERNAME` and/or `PM_IMAP_PASSWORD` are set in the environment they 
 | `PM_IMAP_TLS_SKIP_VERIFY` | auto | Skip TLS verification (auto-enabled for loopback) |
 | `PM_IMAP_APPLY_TIMEOUT` | `180` | Per-command timeout (seconds) for `--apply` |
  
+### SMTP (`higgs send`)
+
+With no `PM_SMTP_*` set, `send` delivers through Proton Mail Bridge at `127.0.0.1:1025` with the stored IMAP credentials.
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `PM_SMTP_HOST` | *(unset)* | SMTP host, e.g. `host.docker.internal` for Bridge seen from a container |
+| `PM_SMTP_PORT` | *(unset)* | SMTP port (Bridge: `1025`); set with `PM_SMTP_HOST` |
+| `PM_SMTP_USERNAME` | stored IMAP username | SMTP login; when it and `PM_SMTP_PASSWORD` are unset, the stored Bridge credentials (env or keystore) are used, and with none stored, `send` skips AUTH |
+| `PM_SMTP_PASSWORD` | stored IMAP password | SMTP password |
+| `PM_SMTP_TLS_SKIP_VERIFY` | auto | Skip TLS verification (auto-enabled for loopback; set `true` or `1` for Bridge at a non-loopback address) |
+
 ### LLM backend
 
 | Variable | Default | Description |

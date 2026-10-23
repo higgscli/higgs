@@ -106,6 +106,21 @@ func cmdSend(f *sendFlags) error {
 			TLSSkipVerify: true,
 		}
 		termio.Info("SMTP env not set; defaulting to Proton Mail Bridge at %s", smtpCfg.Addr())
+	} else if smtpCfg.Username == "" && smtpCfg.Password == "" {
+		// A custom host with no PM_SMTP_* credentials is usually Bridge at
+		// another address (host.docker.internal from a container), so log in
+		// with the stored Bridge credentials as the default path does. With
+		// none stored, send without AUTH for relays that need no login.
+		if cfg.IMAP.Username == "" {
+			if loaded, err := config.LoadFromEnv(); err == nil {
+				cfg = loaded
+			}
+		}
+		if cfg.IMAP.Username != "" {
+			smtpCfg.Username = cfg.IMAP.Username
+			smtpCfg.Password = cfg.IMAP.Password
+			termio.Info("PM_SMTP_USERNAME not set; using the stored IMAP credentials for SMTP at %s", smtpCfg.Addr())
+		}
 	}
 
 	recipients := append(append([]string{}, env.To...), env.Cc...)

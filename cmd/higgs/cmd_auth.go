@@ -166,15 +166,51 @@ func runAuthLogin(username string, passwordStdin bool, backendName string) error
 		return cerr.Validation("password cannot be empty")
 	}
 
-	if err := backend.Set(keystore.Credentials{Username: user, Password: password}); err != nil {
-		return cerr.Auth("store credentials in %s: %s", backend.Name(), err.Error())
+	creds := keystore.Credentials{Username: user, Password: password}
+	out := map[string]any{"stored": true, "username": termio.SanitizeForTerminal(user)}
+	if err := backend.Set(creds); err != nil {
+		e := cerr.Auth("store credentials in %s: %s", backend.Name(), err.Error())
+		if backend.Name() == "system keyring" {
+			e.Hint = keyringFailureHint
+		}
+		// An explicitly chosen backend never silently falls back.
+		if strings.TrimSpace(backendName) != "" {
+			return e
+		}
+		fallback := nextAvailableBackend(backend)
+		if fallback == nil {
+			return e
+		}
+		if ferr := fallback.Set(creds); ferr != nil {
+			return cerr.Auth("store credentials in %s: %s; fallback to %s also failed: %s",
+				backend.Name(), err.Error(), fallback.Name(), ferr.Error())
+		}
+		out["fallback_from"] = backend.Name()
+		backend = fallback
 	}
+	out["backend"] = backend.Name()
+	return tio.PrintJSON(out)
+}
 
-	return tio.PrintJSON(map[string]any{
-		"stored":   true,
-		"backend":  backend.Name(),
-		"username": termio.SanitizeForTerminal(user),
-	})
+// keyringFailureHint explains the usual cause of a keyring write failure on
+// headless Linux (no D-Bus session / Secret Service) and the way out.
+const keyringFailureHint = "no usable OS keyring (on Linux this needs a D-Bus session and a Secret Service such as gnome-keyring). " +
+	"Set PM_KEYSTORE_PASSPHRASE and run `higgs auth login --backend file`, or set PM_IMAP_USERNAME/PM_IMAP_PASSWORD"
+
+// nextAvailableBackend returns the first available real backend after failed
+// in preference order, or nil when none is left.
+func nextAvailableBackend(failed keystore.Backend) keystore.Backend {
+	seen := false
+	for _, b := range keystore.Available() {
+		if b.Name() == failed.Name() {
+			seen = true
+			continue
+		}
+		if seen && b.Available() {
+			return b
+		}
+	}
+	return nil
 }
 
 func runAuthLogout() error {

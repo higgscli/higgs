@@ -275,7 +275,7 @@ higgs auth status
 higgs auth logout
 ```
  
-If `PM_IMAP_USERNAME` and/or `PM_IMAP_PASSWORD` are set in the environment they always win — useful for one-off overrides in CI or shells. To use the encrypted-file backend, export `PM_KEYSTORE_PASSPHRASE` (required to read or write the file) and optionally `PM_KEYSTORE_PATH` to relocate it.
+If `PM_IMAP_USERNAME` and/or `PM_IMAP_PASSWORD` are set in the environment they always win — useful for one-off overrides in CI or shells. To use the encrypted-file backend, export `PM_KEYSTORE_PASSPHRASE` (required to read or write the file) and optionally `PM_KEYSTORE_PATH` to relocate it. If `auth login` runs without `--backend` and the keyring write fails (for example on headless Linux or in a container with no D-Bus session), it falls back to the encrypted file when `PM_KEYSTORE_PASSPHRASE` is set and reports `"fallback_from": "system keyring"`. An explicit `--backend keyring` never falls back.
  
 ### IMAP (Proton Mail Bridge)
  

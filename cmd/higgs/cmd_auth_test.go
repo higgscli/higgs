@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -311,3 +312,91 @@ var (
 )
 
 type keyringBackendHandle struct{ keystore.Backend }
+
+// errKeyringUnavailable mimics what go-keyring returns on a Linux host with no
+// D-Bus session bus (e.g. a minimal container).
+var errKeyringUnavailable = errors.New(`exec: "dbus-launch": executable file not found in $PATH`)
+
+func withPipedPassword(t *testing.T, pw string) {
+	t.Helper()
+	authStdin = strings.NewReader(pw + "\n")
+	authIsTerminal = func(int) bool { return true }
+	t.Cleanup(func() {
+		authStdin = os.Stdin
+		authIsTerminal = func(fd int) bool { return false }
+		keyring.MockInit()
+	})
+}
+
+// With no --backend, a keyring write failure falls back to the encrypted file
+// when PM_KEYSTORE_PASSPHRASE is set.
+func TestAuthLogin_AutoFallsBackToFileWhenKeyringFails(t *testing.T) {
+	authTestSetup(t)
+	keyring.MockInitWithError(errKeyringUnavailable)
+	withPipedPassword(t, "pw")
+
+	stdout, err := runAuthCmd(t, "auth", "login", "--username", "foo@example.com", "--password-stdin")
+	if err != nil {
+		t.Fatalf("login: %v", err)
+	}
+	var out map[string]any
+	if err := json.Unmarshal([]byte(stdout), &out); err != nil {
+		t.Fatalf("unmarshal: %v: %s", err, stdout)
+	}
+	if out["stored"] != true || out["backend"] != "encrypted file" {
+		t.Errorf("out = %v, want stored in encrypted file", out)
+	}
+	if out["fallback_from"] != "system keyring" {
+		t.Errorf("fallback_from = %v, want system keyring", out["fallback_from"])
+	}
+
+	creds, err := config.LoadFromEnv()
+	if err != nil {
+		t.Fatalf("config after fallback login: %v", err)
+	}
+	if creds.IMAP.Username != "foo@example.com" {
+		t.Errorf("resolved username = %q", creds.IMAP.Username)
+	}
+}
+
+// With no --backend and no passphrase, the error explains how to use the file
+// backend instead of surfacing only the raw D-Bus error.
+func TestAuthLogin_KeyringFailsWithoutPassphraseHints(t *testing.T) {
+	authTestSetup(t)
+	os.Unsetenv("PM_KEYSTORE_PASSPHRASE")
+	keyring.MockInitWithError(errKeyringUnavailable)
+	withPipedPassword(t, "pw")
+
+	_, err := runAuthCmd(t, "auth", "login", "--username", "foo", "--password-stdin")
+	if err == nil {
+		t.Fatal("expected error when keyring fails and no fallback is possible")
+	}
+	e := cerr.From(err)
+	if e.ExitCode() != cerr.ExitCodeAuth {
+		t.Errorf("exit = %d, want auth", e.ExitCode())
+	}
+	if !strings.Contains(e.Message, "dbus-launch") {
+		t.Errorf("message should keep the underlying cause: %q", e.Message)
+	}
+	if !strings.Contains(e.Hint, "PM_KEYSTORE_PASSPHRASE") || !strings.Contains(e.Hint, "--backend file") {
+		t.Errorf("hint should point at the file backend: %q", e.Hint)
+	}
+}
+
+// An explicit --backend keyring never silently falls back.
+func TestAuthLogin_ExplicitKeyringDoesNotFallBack(t *testing.T) {
+	authTestSetup(t)
+	keyring.MockInitWithError(errKeyringUnavailable)
+	withPipedPassword(t, "pw")
+
+	_, err := runAuthCmd(t, "auth", "login", "--username", "foo", "--password-stdin", "--backend", "keyring")
+	if err == nil {
+		t.Fatal("explicit keyring backend should fail, not fall back")
+	}
+	if !strings.Contains(cerr.From(err).Hint, "--backend file") {
+		t.Errorf("hint missing: %q", cerr.From(err).Hint)
+	}
+	if _, statErr := os.Stat(os.Getenv("PM_KEYSTORE_PATH")); statErr == nil {
+		t.Error("credential file should not have been written")
+	}
+}

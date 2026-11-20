@@ -7,7 +7,7 @@ require (
 	github.com/emersion/go-imap v1.2.1
 	github.com/emersion/go-message v0.18.2
 	github.com/spf13/cobra v1.10.2
-	github.com/spf13/pflag v1.0.10
+	github.com/spf13/pflag v1.1.0
 	github.com/zalando/go-keyring v0.2.8
 	golang.org/x/crypto v0.57.0
 	golang.org/x/term v0.46.0
